@@ -19,7 +19,9 @@ export interface UploadedImage {
 
 export async function uploadProductImageAction(
   formData: FormData,
-): Promise<{ success: true; image: UploadedImage } | { success: false; error: string }> {
+): Promise<
+  { success: true; image: UploadedImage } | { success: false; error: string }
+> {
   await requireAdmin();
 
   const file = formData.get("file");
@@ -34,10 +36,14 @@ export async function uploadProductImageAction(
   }
 
   try {
-    const blob = await put(`products/${crypto.randomUUID()}-${file.name}`, file, {
-      access: "public",
-      addRandomSuffix: false,
-    });
+    const blob = await put(
+      `products/${crypto.randomUUID()}-${file.name}`,
+      file,
+      {
+        access: "public",
+        addRandomSuffix: false,
+      },
+    );
     return { success: true, image: { url: blob.url, name: file.name } };
   } catch (error) {
     console.error("Failed to upload product image", error);

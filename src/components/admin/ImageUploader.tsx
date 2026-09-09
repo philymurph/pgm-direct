@@ -128,9 +128,7 @@ export function ImageUploader({
         />
       </div>
 
-      {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {images.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
