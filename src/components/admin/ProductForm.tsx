@@ -5,6 +5,7 @@ import {
   upsertProductAction,
   type ProductFormState,
 } from "@/actions/admin/products";
+import { ImageUploader } from "@/components/admin/ImageUploader";
 
 const initialState: ProductFormState = { success: false };
 
@@ -234,21 +235,7 @@ export function ProductForm({
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700">
-          Image URLs{" "}
-          <span className="text-xs text-slate-400">
-            (one per line, first is primary)
-          </span>
-        </label>
-        <textarea
-          name="images"
-          rows={3}
-          defaultValue={defaultValues?.images}
-          placeholder="/images/placeholder-product.svg"
-          className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-mono text-xs"
-        />
-      </div>
+      <ImageUploader name="images" defaultValue={defaultValues?.images} />
 
       <div>
         <label className="block text-sm font-medium text-slate-700">
