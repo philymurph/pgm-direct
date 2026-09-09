@@ -1,0 +1,622 @@
+// PGM Direct — database schema
+// PostgreSQL + Prisma. VAT rates are configurable per product (see VatRate) —
+// no VAT percentage is ever hardcoded in the schema or application logic.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum StockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  AVAILABLE_TO_ORDER
+  DISCONTINUED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  PAYMENT_FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+// Kept distinct from OrderStatus (fulfilment) so payment state can be tracked
+// independently of where the order is in the fulfilment pipeline.
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum AddressType {
+  BILLING
+  DELIVERY
+}
+
+enum EnquiryType {
+  GENERAL
+  SALES
+  TECHNICAL_SUPPORT
+  TRADE_ACCOUNT
+  ORDER_ENQUIRY
+}
+
+enum FilterAttributeType {
+  TEXT
+  NUMBER
+  ENUM
+  BOOLEAN
+}
+
+// ---------------------------------------------------------------------------
+// Identity / customers
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer Customer?
+
+  @@index([role])
+}
+
+model Customer {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+  phone     String?
+
+  // Business customer fields — trade pricing/credit accounts are not enabled
+  // yet but the schema supports them being added without migration surgery.
+  companyName    String?
+  vatNumber      String?
+  isTradeAccount Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses        CustomerAddress[]
+  orders           Order[]
+  favourites       FavouriteProduct[]
+  contactEnquiries ContactEnquiry[]
+  cart             Cart?
+
+  @@index([isTradeAccount])
+}
+
+// One cart per logged-in customer; guest carts are identified by a random
+// token stored in an httpOnly cookie instead of a customer id.
+model Cart {
+  id           String    @id @default(cuid())
+  customerId   String?   @unique
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sessionToken String?   @unique
+
+  items CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CartItem {
+  id        String          @id @default(cuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+}
+
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  label     String? // e.g. "Home", "Warehouse"
+  type      AddressType
+  isDefault Boolean     @default(false)
+
+  contactName String
+  companyName String?
+  line1       String
+  line2       String?
+  city        String
+  county      String?
+  postcode    String?
+  country     String  @default("IE")
+  phone       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  imageUrl    String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  seoTitle        String?
+  metaDescription String?
+
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryHierarchy")
+
+  products         Product[]
+  filterAttributes CategoryFilterAttribute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([sortOrder])
+}
+
+// Defines which spec keys should render as filters for a given category, so
+// filter panels are data-driven rather than hardcoded per category.
+model CategoryFilterAttribute {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  key       String // matches ProductSpecification.key
+  label     String
+  unit      String?
+  type      FilterAttributeType @default(TEXT)
+  sortOrder Int                 @default(0)
+
+  @@unique([categoryId, key])
+  @@index([categoryId])
+}
+
+model Brand {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  logoUrl     String?
+  description String?
+  websiteUrl  String?
+  isFeatured  Boolean @default(false)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VatRate {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g. "Standard 23%", "Zero Rated"
+  ratePercent Decimal @db.Decimal(5, 2)
+  isDefault   Boolean @default(false)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id   String  @id @default(cuid())
+  sku  String  @unique
+  mpn  String? // manufacturer part number
+  name String
+  slug String  @unique
+
+  description      String? @db.Text
+  shortDescription String?
+
+  brandId    String?
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  costPrice         Decimal @db.Decimal(10, 2)
+  sellingPriceExVat Decimal @db.Decimal(10, 2)
+  vatRateId         String
+  vatRate           VatRate @relation(fields: [vatRateId], references: [id])
+
+  weightKg     Decimal? @db.Decimal(8, 3)
+  manufacturer String?
+
+  allowBackorder Boolean @default(false)
+
+  isActive   Boolean @default(true)
+  isFeatured Boolean @default(false)
+  isNew      Boolean @default(false)
+
+  seoTitle        String?
+  metaDescription String?
+
+  images         ProductImage[]
+  specifications ProductSpecification[]
+  documents      ProductDocument[]
+  variants       ProductVariant[]
+  inventory      Inventory?
+  favourites     FavouriteProduct[]
+  orderItems     OrderItem[]
+
+  relatedTo   ProductRelation[] @relation("RelationSource")
+  relatedFrom ProductRelation[] @relation("RelationTarget")
+  cartItems   CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([isActive, isFeatured])
+  @@index([mpn])
+}
+
+// Self-referential product relations, used for both "related products" and
+// "compatible accessories" (distinguished by `kind`).
+model ProductRelation {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation("RelationSource", fields: [productId], references: [id], onDelete: Cascade)
+  relatedId String
+  related   Product @relation("RelationTarget", fields: [relatedId], references: [id], onDelete: Cascade)
+  kind      String  @default("RELATED") // RELATED | ACCESSORY
+  sortOrder Int     @default(0)
+
+  @@unique([productId, relatedId, kind])
+  @@index([productId])
+}
+
+// Variants allow options (e.g. connector type, cable length) without
+// duplicating the parent product; simple products can have zero variants.
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku                String   @unique
+  name               String // e.g. "2m cable", "24V version"
+  priceExVatOverride Decimal? @db.Decimal(10, 2)
+  isActive           Boolean  @default(true)
+
+  inventory Inventory?
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url       String
+  altText   String?
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  @@index([productId])
+}
+
+// Free-form key/value technical specs; `key` is matched against
+// CategoryFilterAttribute.key to drive dynamic per-category filters.
+model ProductSpecification {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  key       String
+  label     String
+  value     String
+  unit      String?
+  sortOrder Int     @default(0)
+
+  @@index([productId])
+  @@index([key])
+}
+
+model ProductDocument {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  title String
+  url   String
+  type  String // DATASHEET | MANUAL | CERTIFICATE | OTHER
+
+  @@index([productId])
+}
+
+// Separate from Product so stock movements/thresholds can evolve (multiple
+// warehouses, reservations) without reshaping the product table.
+model Inventory {
+  id        String          @id @default(cuid())
+  productId String?         @unique
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?         @unique
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantityOnHand    Int         @default(0)
+  quantityReserved  Int         @default(0)
+  lowStockThreshold Int         @default(5)
+  status            StockStatus @default(IN_STOCK)
+
+  updatedAt DateTime @updatedAt
+}
+
+model FavouriteProduct {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, productId])
+}
+
+// ---------------------------------------------------------------------------
+// Shipping / discounts
+// ---------------------------------------------------------------------------
+
+model ShippingMethod {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  price             Decimal  @db.Decimal(10, 2)
+  // Orders at/above this ex-VAT subtotal get this method for free; null = never free automatically.
+  freeAboveSubtotal Decimal? @db.Decimal(10, 2)
+  isQuoteRequired   Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Discount {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  type          DiscountType
+  value         Decimal      @db.Decimal(10, 2)
+  minOrderValue Decimal?     @db.Decimal(10, 2)
+  maxUses       Int?
+  usedCount     Int          @default(0)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean      @default(true)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Orders / payments
+// ---------------------------------------------------------------------------
+
+model Order {
+  id          String @id @default(cuid())
+  // Public-facing invoice/order number, independent of the internal cuid.
+  invoiceSeq  Int    @unique @default(autoincrement())
+  orderNumber String @unique
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  // Guest checkout support.
+  guestEmail String?
+
+  status        OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  // Billing/delivery are snapshotted onto the order so later address edits
+  // never rewrite historical orders.
+  billingContactName String
+  billingCompanyName String?
+  billingVatNumber   String?
+  billingLine1       String
+  billingLine2       String?
+  billingCity        String
+  billingCounty      String?
+  billingPostcode    String?
+  billingCountry     String  @default("IE")
+  billingPhone       String?
+
+  deliveryContactName String
+  deliveryCompanyName String?
+  deliveryLine1       String
+  deliveryLine2       String?
+  deliveryCity        String
+  deliveryCounty      String?
+  deliveryPostcode    String?
+  deliveryCountry     String  @default("IE")
+  deliveryPhone       String?
+
+  purchaseReference String?
+
+  shippingMethodId String?
+  shippingMethod   ShippingMethod? @relation(fields: [shippingMethodId], references: [id])
+
+  discountId String?
+  discount   Discount? @relation(fields: [discountId], references: [id])
+
+  subtotalExVat Decimal @db.Decimal(10, 2)
+  vatTotal      Decimal @db.Decimal(10, 2)
+  shippingExVat Decimal @default(0) @db.Decimal(10, 2)
+  discountTotal Decimal @default(0) @db.Decimal(10, 2)
+  totalIncVat   Decimal @db.Decimal(10, 2)
+
+  trackingNumber  String?
+  trackingCarrier String?
+
+  items    OrderItem[]
+  payments Payment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
+
+  @@index([customerId])
+  @@index([status])
+  @@index([guestEmail])
+}
+
+// Prices are snapshotted at order time so later product price/VAT changes
+// never alter historical order totals.
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  sku             String
+  name            String
+  quantity        Int
+  unitPriceExVat  Decimal @db.Decimal(10, 2)
+  vatRatePercent  Decimal @db.Decimal(5, 2)
+  lineTotalExVat  Decimal @db.Decimal(10, 2)
+  lineVatTotal    Decimal @db.Decimal(10, 2)
+  lineTotalIncVat Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// A single order can have multiple payment attempts (e.g. failed then
+// retried); the order's `paymentStatus` reflects the latest authoritative one.
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider          String        @default("revolut")
+  providerOrderId   String? // Revolut order id
+  providerPaymentId String?
+  status            PaymentStatus @default(PENDING)
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("EUR")
+  failureReason     String?
+  rawResponse       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([providerOrderId])
+}
+
+// Guards Revolut webhook processing against duplicate/replayed events.
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String   @default("revolut")
+  eventId     String
+  eventType   String
+  payload     Json
+  processedAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
+// ---------------------------------------------------------------------------
+// Contact / enquiries
+// ---------------------------------------------------------------------------
+
+model ContactEnquiry {
+  id          String      @id @default(cuid())
+  type        EnquiryType
+  name        String
+  email       String
+  phone       String?
+  company     String?
+  message     String      @db.Text
+  orderNumber String?
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// Site settings (single row) — company details are configured here, never
+// hardcoded, and left blank until the operator supplies real values.
+// ---------------------------------------------------------------------------
+
+model SiteSettings {
+  id                               String  @id @default("singleton")
+  companyLegalName                 String  @default("PGM Technologies Ltd")
+  tradingName                      String  @default("PGM Direct")
+  companyRegistrationNo            String?
+  vatNumber                        String?
+  registeredAddress                String?
+  phone                            String?
+  email                            String?
+  defaultVatRateId                 String?
+  pricesIncludeVatByDefaultDisplay Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
