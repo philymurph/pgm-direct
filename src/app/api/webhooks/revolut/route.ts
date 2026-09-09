@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyRevolutWebhookSignature } from "@/lib/payments/revolut";
+import { sendOrderConfirmationEmail } from "@/lib/email-templates";
 
 // Revolut webhook events we act on. See:
 // https://developer.revolut.com/docs/guides/merchant/monitor-and-observe/webhooks/using-webhooks
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleOrderCompleted(paymentId: string, orderId: string) {
-  await prisma.$transaction(async (tx) => {
+  const paidOrder = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       include: { items: true },
@@ -130,15 +131,16 @@ async function handleOrderCompleted(paymentId: string, orderId: string) {
 
     // Idempotency: only move PENDING_PAYMENT orders to PAID once; a replayed
     // webhook for an already-paid order must not double-reserve stock.
-    if (order.status !== "PENDING_PAYMENT") return;
+    if (order.status !== "PENDING_PAYMENT") return null;
 
     await tx.payment.update({
       where: { id: paymentId },
       data: { status: "PAID" },
     });
-    await tx.order.update({
+    const updated = await tx.order.update({
       where: { id: orderId },
       data: { status: "PAID", paymentStatus: "PAID", paidAt: new Date() },
+      include: { items: true },
     });
 
     for (const item of order.items) {
@@ -148,9 +150,9 @@ async function handleOrderCompleted(paymentId: string, orderId: string) {
         data: { quantityOnHand: { decrement: item.quantity } },
       });
     }
+
+    return updated;
   });
 
-  // Order confirmation email would be dispatched here once an email provider
-  // is configured (see EMAIL_* env vars) — intentionally not stubbed with
-  // fake sender/contact details.
+  if (paidOrder) await sendOrderConfirmationEmail(paidOrder);
 }

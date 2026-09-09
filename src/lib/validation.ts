@@ -13,6 +13,17 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "New passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const addressSchema = z.object({
   label: z.string().trim().optional(),
   type: z.enum(["BILLING", "DELIVERY"]),

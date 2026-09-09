@@ -2,9 +2,54 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/auth";
-import { addressSchema } from "@/lib/validation";
+import { requireSession, hashPassword, verifyPassword } from "@/lib/auth";
+import { addressSchema, changePasswordSchema } from "@/lib/validation";
 import { addToCart } from "@/lib/cart";
+
+export interface ChangePasswordFormState {
+  success: boolean;
+  error?: string;
+}
+
+export async function changePasswordAction(
+  _prev: ChangePasswordFormState,
+  formData: FormData,
+): Promise<ChangePasswordFormState> {
+  const session = await requireSession();
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Please check the form",
+    };
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: session.userId },
+  });
+
+  const currentPasswordValid = await verifyPassword(
+    parsed.data.currentPassword,
+    user.passwordHash,
+  );
+  if (!currentPasswordValid) {
+    return { success: false, error: "Current password is incorrect" };
+  }
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: { passwordHash },
+  });
+
+  return { success: true };
+}
 
 export async function toggleFavouriteAction(productId: string) {
   const session = await requireSession();

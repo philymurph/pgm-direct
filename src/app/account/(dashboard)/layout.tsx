@@ -8,6 +8,7 @@ const navItems = [
   { href: "/account/orders", label: "Orders" },
   { href: "/account/addresses", label: "Addresses" },
   { href: "/account/favourites", label: "Favourites" },
+  { href: "/account/settings", label: "Settings" },
 ];
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {

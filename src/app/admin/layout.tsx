@@ -13,6 +13,7 @@ const navItems = [
   { href: "/admin/shipping", label: "Delivery methods" },
   { href: "/admin/vat-rates", label: "VAT rates" },
   { href: "/admin/discounts", label: "Discount codes" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default async function AdminLayout({

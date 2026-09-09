@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { contactSchema } from "@/lib/validation";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { sendContactEnquiryEmail } from "@/lib/email-templates";
 
 export interface ContactFormState {
   success: boolean;
@@ -46,6 +47,6 @@ export async function submitContactAction(
     data: { ...parsed.data, customerId: session?.customerId },
   });
 
-  // Routing to an email service happens here once EMAIL_* env vars are configured.
+  await sendContactEnquiryEmail(parsed.data);
   return { success: true };
 }

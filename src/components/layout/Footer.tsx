@@ -59,6 +59,21 @@ export async function Footer() {
                 Track an order
               </Link>
             </li>
+            <li>
+              <Link href="/legal/returns" className="hover:text-blue-700">
+                Returns policy
+              </Link>
+            </li>
+            <li>
+              <Link href="/legal/terms" className="hover:text-blue-700">
+                Terms &amp; conditions
+              </Link>
+            </li>
+            <li>
+              <Link href="/legal/privacy" className="hover:text-blue-700">
+                Privacy policy
+              </Link>
+            </li>
           </ul>
         </div>
 
