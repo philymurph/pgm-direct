@@ -1,5 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
+import { REVOLUT_PENDING_ORDER_EXPIRY } from "@/lib/checkout-config";
 
 // Server-only abstraction over the Revolut Merchant API. No route/component
 // should call the Revolut API directly — everything goes through here so the
@@ -82,6 +83,7 @@ export async function createRevolutOrder(
       amount: input.amountMinorUnits,
       currency: input.currency,
       description: input.description,
+      expire_pending_after: REVOLUT_PENDING_ORDER_EXPIRY,
       merchant_order_data: { reference: input.merchantOrderRef },
       customer: input.customerEmail
         ? { email: input.customerEmail }

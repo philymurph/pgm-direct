@@ -116,6 +116,7 @@ export function ContactForm({
         <textarea
           name="message"
           required
+          minLength={10}
           rows={5}
           className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
         />

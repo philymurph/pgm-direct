@@ -23,9 +23,11 @@ function parseInitial(value: string | undefined): ImageItem[] {
 
 export function ImageUploader({
   name,
+  productId,
   defaultValue,
 }: {
   name: string;
+  productId: string | null;
   defaultValue?: string;
 }) {
   const [images, setImages] = useState<ImageItem[]>(() =>
@@ -47,6 +49,7 @@ export function ImageUploader({
       for (const file of imageFiles) {
         const formData = new FormData();
         formData.set("file", file);
+        if (productId) formData.set("productId", productId);
         const result = await uploadProductImageAction(formData);
         if (result.success) {
           setImages((prev) => [...prev, result.image]);
@@ -80,7 +83,9 @@ export function ImageUploader({
       <label className="block text-sm font-medium text-slate-700">
         Product images{" "}
         <span className="text-xs text-slate-400">
-          (drag and drop, first image is primary)
+          {productId
+            ? "(uploads save immediately; first image is primary)"
+            : "(drag and drop, then save the product)"}
         </span>
       </label>
 

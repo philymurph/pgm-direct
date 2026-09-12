@@ -5,6 +5,7 @@ import { SearchBar } from "@/components/search/SearchBar";
 import { VatToggle } from "./VatToggle";
 import { PgmMark } from "./PgmMark";
 import { MobileNav } from "./MobileNav";
+import { getVatDisplayMode } from "@/lib/vat-preference";
 
 const primaryNav = [
   { label: "Products", href: "/products" },
@@ -14,15 +15,20 @@ const primaryNav = [
 ];
 
 export async function Header() {
-  const [session, cartCount] = await Promise.all([
+  const [session, cartCount, vatDisplayMode] = await Promise.all([
     getSession(),
     getCartItemCount(),
+    getVatDisplayMode(),
   ]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <MobileNav navItems={primaryNav} isLoggedIn={!!session} />
+        <MobileNav
+          navItems={primaryNav}
+          isLoggedIn={!!session}
+          vatDisplayMode={vatDisplayMode}
+        />
 
         <Link
           href="/"
@@ -38,7 +44,7 @@ export async function Header() {
 
         <div className="order-2 ml-auto flex items-center gap-4 lg:order-3">
           <div className="hidden lg:block">
-            <VatToggle />
+            <VatToggle defaultMode={vatDisplayMode} />
           </div>
           <Link
             href={session ? "/account" : "/account/login"}

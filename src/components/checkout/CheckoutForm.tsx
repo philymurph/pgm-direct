@@ -29,6 +29,7 @@ export function CheckoutForm({
     token: string;
     publicKey: string;
     environment: string;
+    accessToken: string;
   } | null>(null);
   const widgetContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -48,7 +49,11 @@ export function CheckoutForm({
         target: widgetContainerRef.current!,
         createOrder: async () => ({ publicId: paymentState.token }),
         onSuccess: () => {
-          router.push(`/checkout/success?order=${paymentState.orderNumber}`);
+          const params = new URLSearchParams({
+            order: paymentState.orderNumber,
+            token: paymentState.accessToken,
+          });
+          router.push(`/checkout/success?${params}`);
         },
         onError: ({ error: err }) => {
           setError(err.message || "Payment failed. Please try again.");
@@ -119,7 +124,8 @@ export function CheckoutForm({
       if (
         !result.success ||
         !result.revolutOrderToken ||
-        !result.revolutPublicKey
+        !result.revolutPublicKey ||
+        !result.checkoutAccessToken
       ) {
         setError(result.error ?? "Could not start checkout");
         return;
@@ -129,6 +135,7 @@ export function CheckoutForm({
         token: result.revolutOrderToken,
         publicKey: result.revolutPublicKey,
         environment: result.revolutEnvironment ?? "sandbox",
+        accessToken: result.checkoutAccessToken,
       });
     });
   }
@@ -191,7 +198,7 @@ export function CheckoutForm({
       {!sameAsBilling && (
         <fieldset>
           <legend className="text-sm font-semibold text-slate-900">
-            Delivery address
+            Delivery address (Republic of Ireland only)
           </legend>
           <AddressFields prefix="delivery" />
         </fieldset>
@@ -314,6 +321,9 @@ function AddressFields({ prefix }: { prefix: string }) {
         placeholder="Eircode / Postcode"
         className="rounded border border-slate-300 px-3 py-2 text-sm"
       />
+      <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        Ireland
+      </div>
       <input
         name={`${prefix}_phone`}
         placeholder="Phone"

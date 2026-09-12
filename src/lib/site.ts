@@ -7,3 +7,9 @@ export const siteConfig = {
   description:
     "PGM Direct is an Irish supplier of technical enclosures and specialist components. We currently supply the Bopla enclosure range, with further product categories launching soon.",
 };
+
+export const returnPolicyConfig = {
+  applicableCountry: "IE",
+  returnCountry: "IE",
+  consumerReturnDays: 14,
+} as const;

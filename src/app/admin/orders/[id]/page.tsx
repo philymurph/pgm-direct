@@ -20,6 +20,9 @@ export default async function AdminOrderDetailPage({
   if (!order) notFound();
 
   const canRefund = order.payments.some((p) => p.status === "PAID");
+  const canDelete =
+    ["PENDING_PAYMENT", "PAYMENT_FAILED", "CANCELLED"].includes(order.status) &&
+    ["PENDING", "FAILED", "CANCELLED"].includes(order.paymentStatus);
 
   return (
     <div>
@@ -115,7 +118,12 @@ export default async function AdminOrderDetailPage({
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Status: {order.status.replaceAll("_", " ")} / {order.paymentStatus}
           </h2>
-          <OrderAdminControls orderId={order.id} canRefund={canRefund} />
+          <OrderAdminControls
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            canRefund={canRefund}
+            canDelete={canDelete}
+          />
         </div>
       </div>
     </div>

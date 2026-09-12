@@ -29,10 +29,9 @@ export default async function EditProductPage({
   if (!product) notFound();
 
   const defaultValues = {
-    sku: product.sku,
     mpn: product.mpn,
+    gtin: product.gtin,
     name: product.name,
-    slug: product.slug,
     description: product.description,
     shortDescription: product.shortDescription,
     brandId: product.brandId,
@@ -48,6 +47,7 @@ export default async function EditProductPage({
     isNew: product.isNew,
     seoTitle: product.seoTitle,
     metaDescription: product.metaDescription,
+    googleProductCategory: product.googleProductCategory,
     specifications: product.specifications
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((s) => `${s.label}|${s.key}|${s.value}|${s.unit ?? ""}`)

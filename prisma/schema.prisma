@@ -77,6 +77,14 @@ enum FilterAttributeType {
   BOOLEAN
 }
 
+enum InventoryAllocationStatus {
+  UNRESERVED
+  RESERVED
+  SOLD
+  RELEASED
+  RESTOCKED
+}
+
 // ---------------------------------------------------------------------------
 // Identity / customers
 // ---------------------------------------------------------------------------
@@ -149,8 +157,8 @@ model CartItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([cartId, productId, variantId])
   @@index([cartId])
+  @@index([cartId, productId, variantId])
 }
 
 model CustomerAddress {
@@ -256,6 +264,7 @@ model Product {
   id   String  @id @default(cuid())
   sku  String  @unique
   mpn  String? // manufacturer part number
+  gtin String? @unique // EAN/UPC/GTIN assigned by the manufacturer
   name String
   slug String  @unique
 
@@ -283,6 +292,8 @@ model Product {
 
   seoTitle        String?
   metaDescription String?
+
+  googleProductCategory String?
 
   images         ProductImage[]
   specifications ProductSpecification[]
@@ -332,8 +343,9 @@ model ProductVariant {
   priceExVatOverride Decimal? @db.Decimal(10, 2)
   isActive           Boolean  @default(true)
 
-  inventory Inventory?
-  cartItems CartItem[]
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -465,7 +477,13 @@ model Order {
   customer   Customer? @relation(fields: [customerId], references: [id])
 
   // Guest checkout support.
-  guestEmail String?
+  guestEmail          String?
+  checkoutAccessToken String? @unique @default(cuid())
+  sourceCartId        String?
+
+  // Revolut expires the remote pending order before this local reservation.
+  // The extra grace period allows delayed completion webhooks to arrive.
+  inventoryReservationExpiresAt DateTime?
 
   status        OrderStatus   @default(PENDING_PAYMENT)
   paymentStatus PaymentStatus @default(PENDING)
@@ -520,28 +538,35 @@ model Order {
   @@index([customerId])
   @@index([status])
   @@index([guestEmail])
+  @@index([status, inventoryReservationExpiresAt])
 }
 
 // Prices are snapshotted at order time so later product price/VAT changes
 // never alter historical order totals.
 model OrderItem {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String?
-  product   Product? @relation(fields: [productId], references: [id])
+  product   Product?        @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
-  sku             String
-  name            String
-  quantity        Int
-  unitPriceExVat  Decimal @db.Decimal(10, 2)
-  vatRatePercent  Decimal @db.Decimal(5, 2)
-  lineTotalExVat  Decimal @db.Decimal(10, 2)
-  lineVatTotal    Decimal @db.Decimal(10, 2)
-  lineTotalIncVat Decimal @db.Decimal(10, 2)
+  sku                       String
+  name                      String
+  quantity                  Int
+  allowBackorder            Boolean                   @default(false)
+  inventoryAllocationStatus InventoryAllocationStatus @default(UNRESERVED)
+  unitPriceExVat            Decimal                   @db.Decimal(10, 2)
+  vatRatePercent            Decimal                   @db.Decimal(5, 2)
+  lineTotalExVat            Decimal                   @db.Decimal(10, 2)
+  lineVatTotal              Decimal                   @db.Decimal(10, 2)
+  lineTotalIncVat           Decimal                   @db.Decimal(10, 2)
 
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
+  @@index([orderId, inventoryAllocationStatus])
 }
 
 // A single order can have multiple payment attempts (e.g. failed then

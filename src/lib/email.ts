@@ -30,10 +30,17 @@ interface SendEmailInput {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
 }
 
 /** No-ops with a console warning until EMAIL_* env vars are configured. */
-export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<void> {
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  replyTo,
+}: SendEmailInput): Promise<void> {
   const transporter = getTransporter();
   const from = process.env.EMAIL_FROM;
 
@@ -45,7 +52,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
   }
 
   try {
-    await transporter.sendMail({ from, to, subject, html, text });
+    await transporter.sendMail({ from, to, subject, html, text, replyTo });
   } catch (error) {
     console.error(`Failed to send email "${subject}" to ${to}`, error);
   }

@@ -2,6 +2,11 @@ import "server-only";
 import { prisma } from "./db";
 import { getCartSummary } from "./cart";
 import { calculateLineTotals, calculateOrderTotals } from "./pricing";
+import { INVENTORY_RESERVATION_TTL_MS } from "./checkout-config";
+import {
+  InventoryUnavailableError,
+  reserveInventoryForOrderLine,
+} from "./inventory";
 import type { checkoutSchema } from "./validation";
 import type { z } from "zod";
 
@@ -20,6 +25,8 @@ export async function createPendingOrderFromCart(
 ) {
   const summary = await getCartSummary();
   if (summary.lines.length === 0) throw new CheckoutError("Your cart is empty");
+  if (summary.lines.some((line) => !line.isPurchasable))
+    throw new CheckoutError("Some items in your cart are no longer available");
   if (summary.hasStockIssues)
     throw new CheckoutError("Some items in your cart exceed available stock");
 
@@ -93,69 +100,101 @@ export async function createPendingOrderFromCart(
   const billing = input.sameAsBilling ? input.billing : input.billing;
   const delivery = input.sameAsBilling ? input.billing : input.delivery;
 
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        orderNumber: "PENDING",
-        customerId: customerId ?? undefined,
-        guestEmail: customerId ? undefined : input.guestEmail,
-        purchaseReference: input.purchaseReference,
-        shippingMethodId: shippingMethod.id,
-        discountId: discountId ?? undefined,
-        billingContactName: billing.contactName,
-        billingCompanyName: billing.companyName,
-        billingVatNumber: billing.vatNumber,
-        billingLine1: billing.line1,
-        billingLine2: billing.line2,
-        billingCity: billing.city,
-        billingCounty: billing.county,
-        billingPostcode: billing.postcode,
-        billingCountry: billing.country,
-        billingPhone: billing.phone,
-        deliveryContactName: delivery.contactName,
-        deliveryCompanyName: delivery.companyName,
-        deliveryLine1: delivery.line1,
-        deliveryLine2: delivery.line2,
-        deliveryCity: delivery.city,
-        deliveryCounty: delivery.county,
-        deliveryPostcode: delivery.postcode,
-        deliveryCountry: delivery.country,
-        deliveryPhone: delivery.phone,
-        subtotalExVat: totals.subtotalExVat,
-        vatTotal: totals.vatTotal,
-        shippingExVat: totals.shippingExVat,
-        discountTotal: totals.discountTotal,
-        totalIncVat: totals.totalIncVat,
-        items: {
-          create: summary.lines.map((line, i) => ({
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const allocations = new Map<
+        string,
+        Awaited<ReturnType<typeof reserveInventoryForOrderLine>>
+      >();
+      const linesByInventoryKey = [...summary.lines].sort((a, b) =>
+        `${a.productId}:${a.variantId ?? ""}`.localeCompare(
+          `${b.productId}:${b.variantId ?? ""}`,
+        ),
+      );
+
+      for (const line of linesByInventoryKey) {
+        allocations.set(
+          line.id,
+          await reserveInventoryForOrderLine(tx, {
             productId: line.productId,
-            sku: line.productSlug,
-            name: line.variantName
-              ? `${line.productName} — ${line.variantName}`
-              : line.productName,
+            variantId: line.variantId,
             quantity: line.quantity,
-            unitPriceExVat: lineTotals[i].unitPriceExVat,
-            vatRatePercent: lineTotals[i].vatRatePercent,
-            lineTotalExVat: lineTotals[i].lineTotalExVat,
-            lineVatTotal: lineTotals[i].lineVatTotal,
-            lineTotalIncVat: lineTotals[i].lineTotalIncVat,
-          })),
+          }),
+        );
+      }
+
+      const created = await tx.order.create({
+        data: {
+          orderNumber: "PENDING",
+          customerId: customerId ?? undefined,
+          guestEmail: customerId ? undefined : input.guestEmail,
+          sourceCartId: summary.cartId ?? undefined,
+          inventoryReservationExpiresAt: new Date(
+            Date.now() + INVENTORY_RESERVATION_TTL_MS,
+          ),
+          purchaseReference: input.purchaseReference,
+          shippingMethodId: shippingMethod.id,
+          discountId: discountId ?? undefined,
+          billingContactName: billing.contactName,
+          billingCompanyName: billing.companyName,
+          billingVatNumber: billing.vatNumber,
+          billingLine1: billing.line1,
+          billingLine2: billing.line2,
+          billingCity: billing.city,
+          billingCounty: billing.county,
+          billingPostcode: billing.postcode,
+          billingCountry: billing.country,
+          billingPhone: billing.phone,
+          deliveryContactName: delivery.contactName,
+          deliveryCompanyName: delivery.companyName,
+          deliveryLine1: delivery.line1,
+          deliveryLine2: delivery.line2,
+          deliveryCity: delivery.city,
+          deliveryCounty: delivery.county,
+          deliveryPostcode: delivery.postcode,
+          deliveryCountry: delivery.country,
+          deliveryPhone: delivery.phone,
+          subtotalExVat: totals.subtotalExVat,
+          vatTotal: totals.vatTotal,
+          shippingExVat: totals.shippingExVat,
+          discountTotal: totals.discountTotal,
+          totalIncVat: totals.totalIncVat,
+          items: {
+            create: summary.lines.map((line, i) => {
+              const allocation = allocations.get(line.id)!;
+              return {
+                productId: line.productId,
+                variantId: line.variantId ?? undefined,
+                sku: allocation.sku,
+                name: line.variantName
+                  ? `${line.productName} — ${line.variantName}`
+                  : line.productName,
+                quantity: line.quantity,
+                allowBackorder: allocation.allowBackorder,
+                inventoryAllocationStatus: allocation.inventoryAllocationStatus,
+                unitPriceExVat: lineTotals[i].unitPriceExVat,
+                vatRatePercent: lineTotals[i].vatRatePercent,
+                lineTotalExVat: lineTotals[i].lineTotalExVat,
+                lineVatTotal: lineTotals[i].lineVatTotal,
+                lineTotalIncVat: lineTotals[i].lineTotalIncVat,
+              };
+            }),
+          },
         },
-      },
-    });
-
-    const orderNumber = `PGM-${created.createdAt.getFullYear()}-${String(created.invoiceSeq).padStart(5, "0")}`;
-    await tx.order.update({ where: { id: created.id }, data: { orderNumber } });
-
-    if (discountId) {
-      await tx.discount.update({
-        where: { id: discountId },
-        data: { usedCount: { increment: 1 } },
       });
+
+      const orderNumber = `PGM-${created.createdAt.getFullYear()}-${String(created.invoiceSeq).padStart(5, "0")}`;
+      await tx.order.update({
+        where: { id: created.id },
+        data: { orderNumber },
+      });
+
+      return { ...created, orderNumber };
+    });
+  } catch (error) {
+    if (error instanceof InventoryUnavailableError) {
+      throw new CheckoutError(error.message);
     }
-
-    return { ...created, orderNumber };
-  });
-
-  return order;
+    throw error;
+  }
 }

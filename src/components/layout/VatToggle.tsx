@@ -4,15 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /** Lets customers choose whether prices are emphasised inc. or ex. VAT across the site. */
-export function VatToggle() {
+export function VatToggle({ defaultMode }: { defaultMode: "inc" | "ex" }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"inc" | "ex">("inc");
+  const [mode, setMode] = useState<"inc" | "ex">(defaultMode);
 
   useEffect(() => {
     const match = document.cookie.match(/(?:^|; )pgm_vat_display=([^;]*)/);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a browser-only cookie after hydration
-    setMode(match?.[1] === "ex" ? "ex" : "inc");
-  }, []);
+    setMode(match?.[1] === "ex" ? "ex" : defaultMode);
+  }, [defaultMode]);
 
   function select(next: "inc" | "ex") {
     setMode(next);

@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: process.cwd(),
+  },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.pgmdirect.ie" }],
+        destination: "https://pgmdirect.ie/:path*",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     // Only our own trusted local placeholder assets are SVG; product images
     // uploaded via the admin area are expected to be raster (PNG/JPG/WebP).

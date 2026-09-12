@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { verifyRevolutWebhookSignature } from "@/lib/payments/revolut";
 import { sendOrderConfirmationEmail } from "@/lib/email-templates";
+import {
+  completeOrderPayment,
+  refundOrderPayment,
+} from "@/lib/order-lifecycle";
 
 // Revolut webhook events we act on. See:
 // https://developer.revolut.com/docs/guides/merchant/monitor-and-observe/webhooks/using-webhooks
@@ -47,112 +52,95 @@ export async function POST(req: NextRequest) {
   }
 
   // Idempotency guard: safe to receive/process the same event more than once.
-  const eventId =
-    body.id ?? `${body.event}:${body.order_id}:${timestampHeader}`;
-  const alreadyProcessed = await prisma.webhookEvent
-    .create({
+  const eventId = body.id ?? `${body.event}:${body.order_id}`;
+  let webhookEventId: string;
+  try {
+    const event = await prisma.webhookEvent.create({
       data: {
         provider: "revolut",
         eventId,
         eventType: body.event,
         payload: body as never,
       },
-    })
-    .then(() => false)
-    .catch(() => true);
-
-  if (alreadyProcessed) {
-    return NextResponse.json({ received: true, duplicate: true });
+    });
+    webhookEventId = event.id;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    throw error;
   }
 
-  const payment = await prisma.payment.findFirst({
-    where: { providerOrderId: body.order_id },
-    include: { order: { include: { items: true } } },
-  });
+  try {
+    const payment = await prisma.payment.findFirst({
+      where: { providerOrderId: body.order_id },
+    });
 
-  if (!payment) {
-    console.error(`Revolut webhook for unknown order ${body.order_id}`);
-    return NextResponse.json({ received: true });
-  }
+    if (!payment) {
+      throw new Error(`Revolut webhook for unknown order ${body.order_id}`);
+    }
 
-  switch (body.event) {
-    case "ORDER_AUTHORISED":
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: "AUTHORIZED" },
-      });
-      break;
+    switch (body.event) {
+      case "ORDER_AUTHORISED":
+        await prisma.$transaction([
+          prisma.payment.updateMany({
+            where: {
+              id: payment.id,
+              status: { in: ["PENDING", "FAILED"] },
+            },
+            data: { status: "AUTHORIZED", failureReason: null },
+          }),
+          prisma.order.updateMany({
+            where: { id: payment.orderId, paymentStatus: "PENDING" },
+            data: { paymentStatus: "AUTHORIZED" },
+          }),
+        ]);
+        break;
 
-    case "ORDER_COMPLETED":
-      await handleOrderCompleted(payment.id, payment.orderId);
-      break;
+      case "ORDER_COMPLETED": {
+        const paidOrder = await completeOrderPayment(
+          payment.id,
+          payment.orderId,
+        );
+        if (paidOrder) await sendOrderConfirmationEmail(paidOrder);
+        break;
+      }
 
-    case "ORDER_PAYMENT_FAILED":
-    case "ORDER_PAYMENT_DECLINED":
-      await prisma.$transaction([
-        prisma.payment.update({
-          where: { id: payment.id },
+      case "ORDER_PAYMENT_FAILED":
+      case "ORDER_PAYMENT_DECLINED":
+        // Revolut returns the order to pending so the customer can retry.
+        // Keep the local order and its inventory reservation open as well.
+        await prisma.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { in: ["PENDING", "AUTHORIZED", "FAILED"] },
+          },
           data: { status: "FAILED", failureReason: body.event },
-        }),
-        prisma.order.update({
-          where: { id: payment.orderId },
-          data: { status: "PAYMENT_FAILED", paymentStatus: "FAILED" },
-        }),
-      ]);
-      break;
+        });
+        break;
 
-    case "ORDER_PAYMENT_REFUNDED":
-      await prisma.$transaction([
-        prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: "REFUNDED" },
-        }),
-        prisma.order.update({
-          where: { id: payment.orderId },
-          data: { status: "REFUNDED", paymentStatus: "REFUNDED" },
-        }),
-      ]);
-      break;
+      case "ORDER_PAYMENT_REFUNDED":
+        await refundOrderPayment(payment.id, payment.orderId);
+        break;
 
-    default:
-      // Unhandled event types are acknowledged so Revolut doesn't retry them.
-      break;
+      default:
+        break;
+    }
+  } catch (error) {
+    // A failed event must remain retryable. Keeping its idempotency row would
+    // make Revolut's next delivery look like a successfully handled duplicate.
+    await prisma.webhookEvent
+      .delete({ where: { id: webhookEventId } })
+      .catch(() => undefined);
+    console.error("Failed to process Revolut webhook", error);
+    return NextResponse.json(
+      { error: "Webhook processing failed" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ received: true });
-}
-
-async function handleOrderCompleted(paymentId: string, orderId: string) {
-  const paidOrder = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUniqueOrThrow({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    // Idempotency: only move PENDING_PAYMENT orders to PAID once; a replayed
-    // webhook for an already-paid order must not double-reserve stock.
-    if (order.status !== "PENDING_PAYMENT") return null;
-
-    await tx.payment.update({
-      where: { id: paymentId },
-      data: { status: "PAID" },
-    });
-    const updated = await tx.order.update({
-      where: { id: orderId },
-      data: { status: "PAID", paymentStatus: "PAID", paidAt: new Date() },
-      include: { items: true },
-    });
-
-    for (const item of order.items) {
-      if (!item.productId) continue;
-      await tx.inventory.updateMany({
-        where: { productId: item.productId },
-        data: { quantityOnHand: { decrement: item.quantity } },
-      });
-    }
-
-    return updated;
-  });
-
-  if (paidOrder) await sendOrderConfirmationEmail(paidOrder);
 }

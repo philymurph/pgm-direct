@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
 import { siteConfig } from "@/lib/site";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [products, categories, brands] = await Promise.all([
     prisma.product.findMany({
@@ -40,6 +42,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${siteConfig.url}/contact`,
       changeFrequency: "monthly",
       priority: 0.3,
+    },
+    {
+      url: `${siteConfig.url}/legal/returns`,
+      changeFrequency: "yearly",
+      priority: 0.4,
     },
   ];
 

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { siteConfig } from "@/lib/site";
+import { returnPolicyConfig, siteConfig } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,28 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     alternateName: siteConfig.name,
     url: siteConfig.url,
     slogan: siteConfig.tagline,
+    hasMerchantReturnPolicy: {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: returnPolicyConfig.applicableCountry,
+      returnPolicyCountry: returnPolicyConfig.returnCountry,
+      returnPolicyCategory:
+        "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: returnPolicyConfig.consumerReturnDays,
+      merchantReturnLink: `${siteConfig.url}/legal/returns`,
+      returnMethod: "https://schema.org/ReturnByMail",
+      returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+      returnLabelSource: "https://schema.org/ReturnLabelCustomerResponsibility",
+      customerRemorseReturnFees:
+        "https://schema.org/ReturnFeesCustomerResponsibility",
+      customerRemorseReturnLabelSource:
+        "https://schema.org/ReturnLabelCustomerResponsibility",
+      itemDefectReturnFees: "https://schema.org/FreeReturn",
+      refundType: "https://schema.org/FullRefund",
+      itemCondition: [
+        "https://schema.org/NewCondition",
+        "https://schema.org/DamagedCondition",
+      ],
+    },
   };
 
   return (
@@ -49,12 +72,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(organizationSchema),
+            __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c"),
           }}
         />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );

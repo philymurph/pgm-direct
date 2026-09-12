@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { refundRevolutOrder } from "@/lib/payments/revolut";
+import {
+  cancelPendingOrder,
+  deleteDiscardableOrder,
+  refundOrderPayment,
+} from "@/lib/order-lifecycle";
 
 const FULFILMENT_STATUSES = [
   "PROCESSING",
@@ -21,10 +26,32 @@ export async function updateOrderStatusAction(orderId: string, status: string) {
   ) {
     throw new Error("Invalid fulfilment status");
   }
-  await prisma.order.update({
+  const order = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    data: { status: status as never },
+    select: { status: true, paymentStatus: true },
   });
+
+  if (status === "CANCELLED") {
+    if (["AUTHORIZED", "PAID"].includes(order.paymentStatus)) {
+      throw new Error("Paid or authorised orders must use the refund flow");
+    }
+    if (order.status === "PENDING_PAYMENT") {
+      await cancelPendingOrder(orderId);
+    } else {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: "CANCELLED" },
+      });
+    }
+  } else {
+    if (order.paymentStatus !== "PAID") {
+      throw new Error("Only paid orders can enter fulfilment");
+    }
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: status as never },
+    });
+  }
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
 }
@@ -55,16 +82,13 @@ export async function initiateRefundAction(orderId: string) {
 
   await refundRevolutOrder(payment.providerOrderId);
 
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: "REFUNDED" },
-    }),
-    prisma.order.update({
-      where: { id: orderId },
-      data: { status: "REFUNDED", paymentStatus: "REFUNDED" },
-    }),
-  ]);
+  await refundOrderPayment(payment.id, orderId);
 
   revalidatePath(`/admin/orders/${orderId}`);
+}
+
+export async function deleteOrderAction(orderId: string) {
+  await requireAdmin();
+  await deleteDiscardableOrder(orderId);
+  revalidatePath("/admin/orders");
 }

@@ -23,7 +23,7 @@ export async function registerAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   const ip = getClientIp(await headers());
-  if (!rateLimit(`register:${ip}`, 10, 60_000).allowed) {
+  if (!(await rateLimit(`register:${ip}`, 10, 60_000)).allowed) {
     return {
       success: false,
       error: "Too many attempts. Please try again shortly.",
@@ -81,7 +81,7 @@ export async function loginAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   const ip = getClientIp(await headers());
-  if (!rateLimit(`login:${ip}`, 10, 60_000).allowed) {
+  if (!(await rateLimit(`login:${ip}`, 10, 60_000)).allowed) {
     return {
       success: false,
       error: "Too many attempts. Please try again shortly.",

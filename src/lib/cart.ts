@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
 import { prisma } from "./db";
@@ -99,22 +100,12 @@ export async function mergeGuestCartIntoCustomer(customerId: string) {
   });
 
   for (const item of guestCart.items) {
-    await prisma.cartItem.upsert({
-      where: {
-        cartId_productId_variantId: {
-          cartId: customerCart.id,
-          productId: item.productId,
-          variantId: item.variantId ?? "",
-        },
-      },
-      create: {
-        cartId: customerCart.id,
-        productId: item.productId,
-        variantId: item.variantId,
-        quantity: item.quantity,
-      },
-      update: { quantity: { increment: item.quantity } },
-    });
+    await incrementCartItem(
+      customerCart.id,
+      item.productId,
+      item.variantId,
+      item.quantity,
+    );
   }
 
   await prisma.cart.delete({ where: { id: guestCart.id } });
@@ -152,22 +143,7 @@ export async function addToCart({
 
   await assertStockAvailable(product, variantId ?? null, desiredQuantity);
 
-  await prisma.cartItem.upsert({
-    where: {
-      cartId_productId_variantId: {
-        cartId: cart.id,
-        productId,
-        variantId: variantId ?? "",
-      },
-    },
-    create: {
-      cartId: cart.id,
-      productId,
-      variantId: variantId ?? null,
-      quantity,
-    },
-    update: { quantity: desiredQuantity },
-  });
+  await incrementCartItem(cart.id, productId, variantId ?? null, quantity);
 
   return getOrCreateCart();
 }
@@ -197,19 +173,59 @@ export async function removeCartItem(cartItemId: string) {
   return getOrCreateCart();
 }
 
+async function incrementCartItem(
+  cartId: string,
+  productId: string,
+  variantId: string | null,
+  quantity: number,
+) {
+  const where = { cartId, productId, variantId };
+  const updated = await prisma.cartItem.updateMany({
+    where,
+    data: { quantity: { increment: quantity } },
+  });
+  if (updated.count > 0) return;
+
+  try {
+    await prisma.cartItem.create({
+      data: { cartId, productId, variantId, quantity },
+    });
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+    await prisma.cartItem.updateMany({
+      where,
+      data: { quantity: { increment: quantity } },
+    });
+  }
+}
+
 async function assertStockAvailable(
   product: {
+    id: string;
     allowBackorder: boolean;
     name: string;
     inventory: { quantityOnHand: number; quantityReserved: number } | null;
   },
-  _variantId: string | null,
+  variantId: string | null,
   desiredQuantity: number,
 ) {
+  let inventory = product.inventory;
+  if (variantId) {
+    const variant = await prisma.productVariant.findFirst({
+      where: { id: variantId, productId: product.id, isActive: true },
+      include: { inventory: true },
+    });
+    if (!variant) throw new Error("Product option not available");
+    inventory = variant.inventory;
+  }
   if (product.allowBackorder) return;
   const available =
-    (product.inventory?.quantityOnHand ?? 0) -
-    (product.inventory?.quantityReserved ?? 0);
+    (inventory?.quantityOnHand ?? 0) - (inventory?.quantityReserved ?? 0);
   if (desiredQuantity > available) {
     throw new Error(
       `Only ${Math.max(available, 0)} unit(s) of "${product.name}" are available`,
@@ -240,11 +256,18 @@ export async function getCartSummary() {
     return {
       id: item.id,
       productId: item.productId,
+      sku: item.variant?.sku ?? item.product.sku,
       productName: item.product.name,
       productSlug: item.product.slug,
       image: item.product.images[0]?.url ?? null,
       variantId: item.variantId,
       variantName: item.variant?.name ?? null,
+      allowBackorder: item.product.allowBackorder,
+      isPurchasable:
+        item.product.isActive &&
+        (!item.variantId ||
+          (item.variant?.isActive &&
+            item.variant.productId === item.productId)),
       quantity: item.quantity,
       unitPriceExVat: toNumber(totals.unitPriceExVat),
       vatRatePercent: toNumber(totals.vatRatePercent),

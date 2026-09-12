@@ -27,13 +27,15 @@ export async function generateMetadata({
   if (!product) return {};
 
   const title =
-    product.seoTitle ?? `${product.name} | ${product.mpn ?? product.sku}`;
+    product.seoTitle ??
+    `${product.name} | ${product.mpn ?? product.sku} | ${siteConfig.name}`;
   const description =
     product.metaDescription ?? product.shortDescription ?? undefined;
 
   return {
-    title,
+    title: { absolute: title },
     description,
+    robots: { index: true, follow: true },
     alternates: { canonical: `${siteConfig.url}/products/${product.slug}` },
     openGraph: {
       title,
@@ -82,7 +84,9 @@ export default async function ProductPage({
       ? { "@type": "Brand", name: product.brand.name }
       : undefined,
     description: product.shortDescription ?? product.description ?? undefined,
-    image: product.images.map((i) => `${siteConfig.url}${i.url}`),
+    image: product.images.map((image) =>
+      new URL(image.url, `${siteConfig.url}/`).toString(),
+    ),
     offers: {
       "@type": "Offer",
       priceCurrency: "EUR",
@@ -217,8 +221,9 @@ export default async function ProductPage({
           <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <p className="font-medium text-slate-900">Delivery</p>
             <p className="mt-1">
-              Dispatched from our Irish depot. Delivery options and costs are
-              calculated at checkout.
+              Dispatched from our Irish depot. We currently deliver only within
+              the Republic of Ireland. Options and costs are calculated at
+              checkout.
             </p>
           </div>
 

@@ -12,9 +12,11 @@ interface NavItem {
 export function MobileNav({
   navItems,
   isLoggedIn,
+  vatDisplayMode,
 }: {
   navItems: NavItem[];
   isLoggedIn: boolean;
+  vatDisplayMode: "inc" | "ex";
 }) {
   const [open, setOpen] = useState(false);
 
@@ -87,7 +89,7 @@ export function MobileNav({
 
             <div className="space-y-1 border-t border-slate-100 px-2 py-3">
               <div className="px-3 py-2">
-                <VatToggle />
+                <VatToggle defaultMode={vatDisplayMode} />
               </div>
               <Link
                 href={isLoggedIn ? "/account" : "/account/login"}

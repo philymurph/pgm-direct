@@ -1,9 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addTrackingAction,
+  deleteOrderAction,
   initiateRefundAction,
   updateOrderStatusAction,
 } from "@/actions/admin/orders";
@@ -12,12 +13,17 @@ const FULFILMENT_STATUSES = ["PROCESSING", "SHIPPED", "COMPLETED", "CANCELLED"];
 
 export function OrderAdminControls({
   orderId,
+  orderNumber,
   canRefund,
+  canDelete,
 }: {
   orderId: string;
+  orderNumber: string;
   canRefund: boolean;
+  canDelete: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   function handleTracking(e: React.FormEvent<HTMLFormElement>) {
@@ -31,6 +37,12 @@ export function OrderAdminControls({
 
   return (
     <div className="space-y-4">
+      {error && (
+        <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </p>
+      )}
+
       <div>
         <label className="block text-xs font-medium text-slate-700">
           Fulfilment status
@@ -95,6 +107,38 @@ export function OrderAdminControls({
           className="rounded border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
         >
           Refund payment
+        </button>
+      )}
+
+      {canDelete && (
+        <button
+          type="button"
+          onClick={() => {
+            if (
+              !confirm(
+                `Permanently delete ${orderNumber}? This cannot be undone.`,
+              )
+            ) {
+              return;
+            }
+            setError(null);
+            startTransition(async () => {
+              try {
+                await deleteOrderAction(orderId);
+                router.push("/admin/orders");
+              } catch (deleteError) {
+                setError(
+                  deleteError instanceof Error
+                    ? deleteError.message
+                    : "Could not delete order",
+                );
+              }
+            });
+          }}
+          disabled={isPending}
+          className="w-full rounded border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+        >
+          Delete order permanently
         </button>
       )}
     </div>

@@ -15,10 +15,9 @@ interface ProductFormProps {
   brands: { id: string; name: string }[];
   vatRates: { id: string; name: string }[];
   defaultValues?: {
-    sku: string;
     mpn: string | null;
+    gtin: string | null;
     name: string;
-    slug: string;
     description: string | null;
     shortDescription: string | null;
     brandId: string | null;
@@ -34,6 +33,7 @@ interface ProductFormProps {
     isNew: boolean;
     seoTitle: string | null;
     metaDescription: string | null;
+    googleProductCategory: string | null;
     specifications: string;
     images: string;
     documents: string;
@@ -58,20 +58,6 @@ export function ProductForm({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field
-          label="SKU"
-          name="sku"
-          defaultValue={defaultValues?.sku}
-          required
-        />
-        <Field
-          label="Manufacturer part number"
-          name="mpn"
-          defaultValue={defaultValues?.mpn ?? ""}
-        />
-      </div>
-
       <Field
         label="Product name"
         name="name"
@@ -79,10 +65,14 @@ export function ProductForm({
         required
       />
       <Field
-        label="Slug"
-        name="slug"
-        defaultValue={defaultValues?.slug}
-        required
+        label="Manufacturer part number"
+        name="mpn"
+        defaultValue={defaultValues?.mpn ?? ""}
+      />
+      <Field
+        label="GTIN / EAN / UPC"
+        name="gtin"
+        defaultValue={defaultValues?.gtin ?? ""}
       />
 
       <div>
@@ -235,7 +225,11 @@ export function ProductForm({
         />
       </div>
 
-      <ImageUploader name="images" defaultValue={defaultValues?.images} />
+      <ImageUploader
+        name="images"
+        productId={productId}
+        defaultValue={defaultValues?.images}
+      />
 
       <div>
         <label className="block text-sm font-medium text-slate-700">
@@ -253,6 +247,11 @@ export function ProductForm({
       </div>
 
       <div className="grid grid-cols-1 gap-4">
+        <Field
+          label="Google product category ID or path"
+          name="googleProductCategory"
+          defaultValue={defaultValues?.googleProductCategory ?? ""}
+        />
         <Field
           label="SEO title"
           name="seoTitle"

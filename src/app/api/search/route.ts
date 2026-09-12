@@ -6,7 +6,7 @@ import { calculateVat } from "@/lib/pricing";
 
 export async function GET(req: NextRequest) {
   const ip = getClientIp(req.headers);
-  const { allowed } = rateLimit(`search:${ip}`, 60, 60_000);
+  const { allowed } = await rateLimit(`search:${ip}`, 60, 60_000);
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

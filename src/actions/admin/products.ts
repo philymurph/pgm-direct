@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { productAdminSchema } from "@/lib/validation";
+import { slugify } from "@/lib/slugify";
+import type { Prisma } from "@prisma/client";
+import type { z } from "zod";
 
 export interface ProductFormState {
   success: boolean;
@@ -27,10 +30,9 @@ export async function upsertProductAction(
   await requireAdmin();
 
   const parsed = productAdminSchema.safeParse({
-    sku: formData.get("sku"),
     mpn: formData.get("mpn") || undefined,
+    gtin: formData.get("gtin") || undefined,
     name: formData.get("name"),
-    slug: formData.get("slug"),
     description: formData.get("description") || undefined,
     shortDescription: formData.get("shortDescription") || undefined,
     brandId: formData.get("brandId") || undefined,
@@ -46,6 +48,7 @@ export async function upsertProductAction(
     isNew: formData.get("isNew") === "on",
     seoTitle: formData.get("seoTitle") || undefined,
     metaDescription: formData.get("metaDescription") || undefined,
+    googleProductCategory: formData.get("googleProductCategory") || undefined,
   });
 
   if (!parsed.success) {
@@ -88,11 +91,13 @@ export async function upsertProductAction(
 
   try {
     const product = await prisma.$transaction(async (tx) => {
+      if (!productId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('pgm-direct-product-identifiers'))`;
+      }
+
       const saved = productId
         ? await tx.product.update({ where: { id: productId }, data })
-        : await tx.product.create({
-            data: { ...data, inventory: { create: {} } },
-          });
+        : await createProductWithGeneratedIdentifiers(tx, data);
 
       await tx.productSpecification.deleteMany({
         where: { productId: saved.id },
@@ -127,9 +132,41 @@ export async function upsertProductAction(
     console.error("Failed to save product", error);
     return {
       success: false,
-      error: "Could not save product — check the SKU and slug are unique",
+      error: "Could not save product — please check the product details",
     };
   }
+}
+
+async function createProductWithGeneratedIdentifiers(
+  tx: Prisma.TransactionClient,
+  data: z.infer<typeof productAdminSchema>,
+) {
+  const rows = await tx.$queryRaw<Array<{ nextSkuNumber: number }>>`
+    SELECT COALESCE(MAX(
+      CASE
+        WHEN "sku" ~ '^PGM-[0-9]+$'
+        THEN SUBSTRING("sku" FROM 5)::INTEGER
+        ELSE 0
+      END
+    ), 0) + 1 AS "nextSkuNumber"
+    FROM "Product"
+  `;
+  const nextSkuNumber = Number(rows[0]?.nextSkuNumber ?? 1);
+  const sku = `PGM-${String(nextSkuNumber).padStart(5, "0")}`;
+
+  const baseSlug = slugify(data.name) || `product-${nextSkuNumber}`;
+  let slug = baseSlug;
+  let suffix = 2;
+  while (
+    await tx.product.findUnique({ where: { slug }, select: { id: true } })
+  ) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return tx.product.create({
+    data: { ...data, sku, slug, inventory: { create: {} } },
+  });
 }
 
 export async function deleteProductAction(productId: string) {

@@ -17,7 +17,7 @@ export async function submitContactAction(
   formData: FormData,
 ): Promise<ContactFormState> {
   const ip = getClientIp(await headers());
-  if (!rateLimit(`contact:${ip}`, 5, 60_000).allowed) {
+  if (!(await rateLimit(`contact:${ip}`, 5, 60_000)).allowed) {
     return {
       success: false,
       error: "Too many submissions. Please try again shortly.",

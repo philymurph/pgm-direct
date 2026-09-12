@@ -1,4 +1,4 @@
-import type { Order, OrderItem } from "@prisma/client";
+import type { Order, OrderItem, User } from "@prisma/client";
 import { siteConfig } from "@/lib/site";
 import { sendEmail } from "@/lib/email";
 
@@ -7,9 +7,12 @@ function formatEuro(value: number): string {
 }
 
 export async function sendOrderConfirmationEmail(
-  order: Order & { items: OrderItem[] },
+  order: Order & {
+    items: OrderItem[];
+    customer?: { user: Pick<User, "email"> } | null;
+  },
 ): Promise<void> {
-  const to = order.guestEmail ?? undefined;
+  const to = order.guestEmail ?? order.customer?.user.email;
   if (!to) return;
 
   const itemRows = order.items
@@ -22,7 +25,10 @@ export async function sendOrderConfirmationEmail(
     .join("");
 
   const itemLines = order.items
-    .map((item) => `${item.name} x${item.quantity} — ${formatEuro(Number(item.lineTotalIncVat))}`)
+    .map(
+      (item) =>
+        `${item.name} x${item.quantity} — ${formatEuro(Number(item.lineTotalIncVat))}`,
+    )
     .join("\n");
 
   const html = `
@@ -55,11 +61,11 @@ interface ContactEnquiryInput {
   orderNumber?: string | null;
 }
 
-/** Notifies the shop's own inbox (EMAIL_FROM) of a new contact form submission. */
+/** Notifies the shop's contact inbox of a new contact form submission. */
 export async function sendContactEnquiryEmail(
   enquiry: ContactEnquiryInput,
 ): Promise<void> {
-  const to = process.env.EMAIL_FROM;
+  const to = process.env.EMAIL_CONTACT_TO ?? process.env.EMAIL_FROM;
   if (!to) return;
 
   const details = [
@@ -78,5 +84,6 @@ export async function sendContactEnquiryEmail(
     subject: `New contact enquiry from ${enquiry.name}`,
     text: `${details}\n\nMessage:\n${enquiry.message}`,
     html: `<pre>${details}</pre><p>${enquiry.message}</p>`,
+    replyTo: enquiry.email,
   });
 }

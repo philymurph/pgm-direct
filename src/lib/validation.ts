@@ -1,7 +1,35 @@
 import { z } from "zod";
 
+const commonEmailDomainCorrections = new Map([
+  ["gmail.con", "gmail.com"],
+  ["gmial.com", "gmail.com"],
+  ["gmai.com", "gmail.com"],
+  ["hotmail.con", "hotmail.com"],
+  ["outlook.con", "outlook.com"],
+  ["icloud.con", "icloud.com"],
+  ["yahoo.con", "yahoo.com"],
+]);
+
+export const customerEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Enter a valid email address")
+  .superRefine((email, context) => {
+    const domain = email.split("@").at(-1);
+    const correction = domain
+      ? commonEmailDomainCorrections.get(domain)
+      : undefined;
+    if (!correction) return;
+
+    context.addIssue({
+      code: "custom",
+      message: `Check your email address. Did you mean ${email.slice(0, email.lastIndexOf("@") + 1)}${correction}?`,
+    });
+  });
+
 export const registerSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  email: customerEmailSchema,
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
@@ -9,7 +37,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  email: customerEmailSchema,
   password: z.string().min(1),
 });
 
@@ -39,36 +67,50 @@ export const addressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-export const checkoutSchema = z.object({
-  guestEmail: z.string().trim().toLowerCase().email().optional(),
-  purchaseReference: z.string().trim().optional(),
-  shippingMethodId: z.string().min(1, "Please select a delivery method"),
-  discountCode: z.string().trim().optional(),
-  billing: z.object({
-    contactName: z.string().trim().min(1),
-    companyName: z.string().trim().optional(),
-    vatNumber: z.string().trim().optional(),
-    line1: z.string().trim().min(1),
-    line2: z.string().trim().optional(),
-    city: z.string().trim().min(1),
-    county: z.string().trim().optional(),
-    postcode: z.string().trim().optional(),
-    country: z.string().trim().default("IE"),
-    phone: z.string().trim().optional(),
-  }),
-  delivery: z.object({
-    contactName: z.string().trim().min(1),
-    companyName: z.string().trim().optional(),
-    line1: z.string().trim().min(1),
-    line2: z.string().trim().optional(),
-    city: z.string().trim().min(1),
-    county: z.string().trim().optional(),
-    postcode: z.string().trim().optional(),
-    country: z.string().trim().default("IE"),
-    phone: z.string().trim().optional(),
-  }),
-  sameAsBilling: z.boolean().optional(),
-});
+export const checkoutSchema = z
+  .object({
+    guestEmail: customerEmailSchema.optional(),
+    purchaseReference: z.string().trim().optional(),
+    shippingMethodId: z.string().min(1, "Please select a delivery method"),
+    discountCode: z.string().trim().optional(),
+    billing: z.object({
+      contactName: z.string().trim().min(1),
+      companyName: z.string().trim().optional(),
+      vatNumber: z.string().trim().optional(),
+      line1: z.string().trim().min(1),
+      line2: z.string().trim().optional(),
+      city: z.string().trim().min(1),
+      county: z.string().trim().optional(),
+      postcode: z.string().trim().optional(),
+      country: z.string().trim().default("IE"),
+      phone: z.string().trim().optional(),
+    }),
+    delivery: z.object({
+      contactName: z.string().trim().min(1),
+      companyName: z.string().trim().optional(),
+      line1: z.string().trim().min(1),
+      line2: z.string().trim().optional(),
+      city: z.string().trim().min(1),
+      county: z.string().trim().optional(),
+      postcode: z.string().trim().optional(),
+      country: z.string().trim().default("IE"),
+      phone: z.string().trim().optional(),
+    }),
+    sameAsBilling: z.boolean().optional(),
+  })
+  .superRefine((checkout, context) => {
+    const deliveryCountry = checkout.sameAsBilling
+      ? checkout.billing.country
+      : checkout.delivery.country;
+    if (deliveryCountry === "IE") return;
+
+    context.addIssue({
+      code: "custom",
+      path: [checkout.sameAsBilling ? "billing" : "delivery", "country"],
+      message:
+        "Delivery is currently available only within the Republic of Ireland",
+    });
+  });
 
 export const contactSchema = z.object({
   type: z.enum([
@@ -79,18 +121,54 @@ export const contactSchema = z.object({
     "ORDER_ENQUIRY",
   ]),
   name: z.string().trim().min(1),
-  email: z.string().trim().toLowerCase().email(),
+  email: customerEmailSchema,
   phone: z.string().trim().optional(),
   company: z.string().trim().optional(),
-  message: z.string().trim().min(10, "Please provide a few more details"),
+  message: z.string().trim().min(10, "Message must be at least 10 characters"),
   orderNumber: z.string().trim().optional(),
 });
 
+export const siteSettingsAdminSchema = z.object({
+  companyLegalName: z.string().trim().min(1, "Enter the legal company name"),
+  tradingName: z.string().trim().min(1, "Enter the trading name"),
+  companyRegistrationNo: z.string().trim().optional(),
+  vatNumber: z.string().trim().optional(),
+  registeredAddress: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().email("Enter a valid email address").optional(),
+  defaultVatRateId: z.string().trim().optional(),
+  pricesIncludeVatByDefaultDisplay: z.boolean(),
+});
+
+export const gtinSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/[\s-]/g, ""))
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/,
+        "Enter a valid 8, 12, 13, or 14 digit GTIN",
+      )
+      .refine((value) => {
+        const digits = [...value].map(Number);
+        const checkDigit = digits.pop();
+        const sum = digits
+          .reverse()
+          .reduce(
+            (total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1),
+            0,
+          );
+
+        return (10 - (sum % 10)) % 10 === checkDigit;
+      }, "Enter a GTIN with a valid check digit"),
+  );
+
 export const productAdminSchema = z.object({
-  sku: z.string().trim().min(1),
   mpn: z.string().trim().optional(),
+  gtin: gtinSchema.optional(),
   name: z.string().trim().min(1),
-  slug: z.string().trim().min(1),
   description: z.string().optional(),
   shortDescription: z.string().optional(),
   brandId: z.string().optional(),
@@ -106,6 +184,7 @@ export const productAdminSchema = z.object({
   isNew: z.boolean().optional(),
   seoTitle: z.string().trim().optional(),
   metaDescription: z.string().trim().optional(),
+  googleProductCategory: z.string().trim().max(750).optional(),
 });
 
 export const categoryAdminSchema = z.object({
