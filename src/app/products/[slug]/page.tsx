@@ -14,6 +14,10 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { siteConfig } from "@/lib/site";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  getMerchantAvailability,
+  getSchemaAvailability,
+} from "@/lib/google-merchant";
 
 export const revalidate = 300;
 
@@ -61,6 +65,17 @@ export default async function ProductPage({
   const available =
     (product.inventory?.quantityOnHand ?? 0) -
     (product.inventory?.quantityReserved ?? 0);
+  const merchantAvailability = getMerchantAvailability(product);
+  const displayStockStatus =
+    product.inventory?.status === "DISCONTINUED"
+      ? "DISCONTINUED"
+      : merchantAvailability === "in_stock"
+        ? product.inventory?.status === "LOW_STOCK"
+          ? "LOW_STOCK"
+          : "IN_STOCK"
+        : merchantAvailability === "backorder"
+          ? "AVAILABLE_TO_ORDER"
+          : "OUT_OF_STOCK";
   const accessories = await getAccessoriesForProduct(product.id);
   const session = await getSession();
   const isFavourited = session?.customerId
@@ -80,6 +95,7 @@ export default async function ProductPage({
     name: product.name,
     sku: product.sku,
     mpn: product.mpn ?? undefined,
+    gtin: product.gtin ?? undefined,
     brand: product.brand
       ? { "@type": "Brand", name: product.brand.name }
       : undefined,
@@ -91,10 +107,8 @@ export default async function ProductPage({
       "@type": "Offer",
       priceCurrency: "EUR",
       price: vat.priceIncVat.toString(),
-      availability:
-        product.inventory?.status === "OUT_OF_STOCK"
-          ? "https://schema.org/OutOfStock"
-          : "https://schema.org/InStock",
+      availability: getSchemaAvailability(merchantAvailability),
+      itemCondition: "https://schema.org/NewCondition",
       url: `${siteConfig.url}/products/${product.slug}`,
     },
   };
@@ -123,11 +137,15 @@ export default async function ProductPage({
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
 
       <nav className="mb-4 text-xs text-slate-500">
@@ -187,9 +205,7 @@ export default async function ProductPage({
           </div>
 
           <div className="mt-3 flex items-center gap-3">
-            {product.inventory && (
-              <StockBadge status={product.inventory.status} />
-            )}
+            <StockBadge status={displayStockStatus} />
             {product.inventory && !product.allowBackorder && available > 0 && (
               <span className="text-xs text-slate-500">
                 {available} available

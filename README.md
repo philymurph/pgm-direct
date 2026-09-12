@@ -118,6 +118,25 @@ product references one. Nothing in the codebase hardcodes a percentage —
 `/admin/vat-rates`; the default selected under `/admin/settings` is used for
 delivery VAT and the storefront display preference.
 
+## Google Merchant Center
+
+The public RSS product feed is available at:
+
+```
+https://pgmdirect.ie/google-merchant.xml
+```
+
+Register this URL as a primary file data source in Merchant Center with Ireland
+as the target country, English as the language, and a daily fetch schedule. The
+feed is generated from the current database and includes VAT-inclusive EUR
+prices, live availability, product links, images, brand, MPN, GTIN, category,
+and shipping weight where available.
+
+Only active products with at least one valid HTTP(S) image are included. Manage
+GTIN and Google product category values in the product admin area. Delivery
+charges and delivery times remain configured at account level in Merchant
+Center so they can match the checkout methods and thresholds.
+
 ## Admin area
 
 `/admin` (protected, `role: ADMIN` required) covers products, categories,
