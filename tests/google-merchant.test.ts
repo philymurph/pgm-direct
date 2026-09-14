@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildGoogleMerchantFeed,
   getMerchantAvailability,
+  getOfferMerchantReturnPolicy,
   getSchemaAvailability,
 } from "../src/lib/google-merchant";
 
@@ -44,6 +45,17 @@ test("maps sellable, backorder, and unavailable inventory consistently", () => {
     getSchemaAvailability("backorder"),
     "https://schema.org/BackOrder",
   );
+});
+
+test("builds a Google-supported offer-level return policy", () => {
+  assert.deepEqual(getOfferMerchantReturnPolicy(), {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: "IE",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: 14,
+    returnMethod: "https://schema.org/ReturnByMail",
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  });
 });
 
 test("builds escaped Google Merchant RSS with identifiers and optional fields", () => {

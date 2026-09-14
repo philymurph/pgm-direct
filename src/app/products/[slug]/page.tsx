@@ -16,6 +16,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   getMerchantAvailability,
+  getOfferMerchantReturnPolicy,
   getSchemaAvailability,
 } from "@/lib/google-merchant";
 
@@ -110,6 +111,7 @@ export default async function ProductPage({
       availability: getSchemaAvailability(merchantAvailability),
       itemCondition: "https://schema.org/NewCondition",
       url: `${siteConfig.url}/products/${product.slug}`,
+      hasMerchantReturnPolicy: getOfferMerchantReturnPolicy(),
     },
   };
 

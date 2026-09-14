@@ -1,3 +1,5 @@
+import { returnPolicyConfig } from "@/lib/site";
+
 export type MerchantAvailability = "in_stock" | "out_of_stock" | "backorder";
 
 export interface InventoryAvailabilityInput {
@@ -38,6 +40,17 @@ export function getSchemaAvailability(
     case "out_of_stock":
       return "https://schema.org/OutOfStock";
   }
+}
+
+export function getOfferMerchantReturnPolicy() {
+  return {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: returnPolicyConfig.applicableCountry,
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: returnPolicyConfig.consumerReturnDays,
+    returnMethod: "https://schema.org/ReturnByMail",
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  };
 }
 
 export interface GoogleMerchantFeedItem {
