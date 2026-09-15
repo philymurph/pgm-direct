@@ -4,6 +4,7 @@ import {
   buildGoogleMerchantFeed,
   getMerchantAvailability,
   getOfferMerchantReturnPolicy,
+  getOfferShippingDetails,
   getSchemaAvailability,
 } from "../src/lib/google-merchant";
 
@@ -55,6 +56,16 @@ test("builds a Google-supported offer-level return policy", () => {
     merchantReturnDays: 14,
     returnMethod: "https://schema.org/ReturnByMail",
     returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  });
+});
+
+test("builds offer shipping details for Ireland destination", () => {
+  assert.deepEqual(getOfferShippingDetails(), {
+    "@type": "OfferShippingDetails",
+    shippingDestination: {
+      "@type": "DefinedRegion",
+      addressCountry: "IE",
+    },
   });
 });
 

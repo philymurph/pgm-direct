@@ -53,6 +53,16 @@ export function getOfferMerchantReturnPolicy() {
   };
 }
 
+export function getOfferShippingDetails() {
+  return {
+    "@type": "OfferShippingDetails",
+    shippingDestination: {
+      "@type": "DefinedRegion",
+      addressCountry: "IE",
+    },
+  };
+}
+
 export interface GoogleMerchantFeedItem {
   id: string;
   title: string;

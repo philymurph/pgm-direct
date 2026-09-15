@@ -25,7 +25,11 @@ import { Redis } from "@upstash/redis";
 const redis = Redis.fromEnv();
 
 // Simple fixed-window rate limiter
-async function simpleRateLimit(userId: string, limit: number = 10, window: number = 60) {
+async function simpleRateLimit(
+  userId: string,
+  limit: number = 10,
+  window: number = 60,
+) {
   const key = `ratelimit:${userId}`;
 
   const count = await redis.incr(key);
@@ -49,7 +53,11 @@ if (!result.allowed) {
 }
 
 // Sliding window rate limiter using sorted set
-async function slidingWindowRateLimit(userId: string, limit: number = 10, window: number = 60) {
+async function slidingWindowRateLimit(
+  userId: string,
+  limit: number = 10,
+  window: number = 60,
+) {
   const key = `ratelimit:sliding:${userId}`;
   const now = Date.now();
   const windowStart = now - window * 1000;
@@ -100,11 +108,19 @@ const tokenBucketScript = `
   end
 `;
 
-async function tokenBucketRateLimit(userId: string, capacity: number = 10, rate: number = 1) {
+async function tokenBucketRateLimit(
+  userId: string,
+  capacity: number = 10,
+  rate: number = 1,
+) {
   const key = `ratelimit:bucket:${userId}`;
   const now = Date.now() / 1000;
 
-  const allowed = await redis.eval<number>(tokenBucketScript, [key], [capacity, rate, now]);
+  const allowed = await redis.eval<number>(
+    tokenBucketScript,
+    [key],
+    [capacity, rate, now],
+  );
 
   return { allowed: allowed === 1 };
 }
@@ -133,7 +149,8 @@ const tokenBucketLimiter = new Ratelimit({
 
 // Usage
 async function handleRequest(userId: string) {
-  const { success, limit, remaining, reset } = await fixedWindowLimiter.limit(userId);
+  const { success, limit, remaining, reset } =
+    await fixedWindowLimiter.limit(userId);
 
   if (!success) {
     return {
