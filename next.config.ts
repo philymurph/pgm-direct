@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       // Product images uploaded via the admin drag-and-drop uploader.
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      // Imported supplier images for catalog entries.
+      { protocol: "https", hostname: "farm.avmap.it" },
     ],
   },
 };
