@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { FilterSidebar } from "./FilterSidebar";
 import { SortSelect } from "./SortSelect";
 import { Pagination } from "./Pagination";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl } from "@/lib/site";
 
 type CategoryWithNav = {
   id: string;
@@ -63,14 +63,14 @@ export async function CategoryPageContent({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
       ...(category.parent
         ? [
             {
               "@type": "ListItem",
               position: 2,
               name: category.parent.name,
-              item: `${siteConfig.url}/${category.parent.slug}`,
+              item: absoluteUrl(`/${category.parent.slug}`),
             },
           ]
         : []),
@@ -78,7 +78,7 @@ export async function CategoryPageContent({
         "@type": "ListItem",
         position: category.parent ? 3 : 2,
         name: category.name,
-        item: `${siteConfig.url}/${category.parent ? `${category.parent.slug}/` : ""}${category.slug}`,
+        item: absoluteUrl(`/${category.parent ? `${category.parent.slug}/` : ""}${category.slug}`),
       },
     ],
   };

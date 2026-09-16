@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -22,50 +22,50 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: siteConfig.url, changeFrequency: "daily", priority: 1 },
+    { url: absoluteUrl("/"), changeFrequency: "daily", priority: 1 },
     {
-      url: `${siteConfig.url}/products`,
+      url: absoluteUrl("/products"),
       changeFrequency: "daily",
       priority: 0.9,
     },
     {
-      url: `${siteConfig.url}/brands`,
+      url: absoluteUrl("/brands"),
       changeFrequency: "weekly",
       priority: 0.7,
     },
     {
-      url: `${siteConfig.url}/categories`,
+      url: absoluteUrl("/categories"),
       changeFrequency: "weekly",
       priority: 0.7,
     },
     {
-      url: `${siteConfig.url}/contact`,
+      url: absoluteUrl("/contact"),
       changeFrequency: "monthly",
       priority: 0.3,
     },
     {
-      url: `${siteConfig.url}/legal/returns`,
+      url: absoluteUrl("/legal/returns"),
       changeFrequency: "yearly",
       priority: 0.4,
     },
   ];
 
   const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({
-    url: `${siteConfig.url}/${c.parent ? `${c.parent.slug}/` : ""}${c.slug}`,
+    url: absoluteUrl(`/${c.parent ? `${c.parent.slug}/` : ""}${c.slug}`),
     lastModified: c.updatedAt,
     changeFrequency: "daily",
     priority: c.parent ? 0.6 : 0.8,
   }));
 
   const productRoutes: MetadataRoute.Sitemap = products.map((p) => ({
-    url: `${siteConfig.url}/products/${p.slug}`,
+    url: absoluteUrl(`/products/${p.slug}`),
     lastModified: p.updatedAt,
     changeFrequency: "daily",
     priority: 0.7,
   }));
 
   const brandRoutes: MetadataRoute.Sitemap = brands.map((b) => ({
-    url: `${siteConfig.url}/brands/${b.slug}`,
+    url: absoluteUrl(`/brands/${b.slug}`),
     changeFrequency: "weekly",
     priority: 0.5,
   }));

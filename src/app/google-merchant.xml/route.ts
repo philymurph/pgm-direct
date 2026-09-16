@@ -5,13 +5,13 @@ import {
   type GoogleMerchantFeedItem,
 } from "@/lib/google-merchant";
 import { calculateVat } from "@/lib/pricing";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 function toAbsoluteHttpUrl(value: string): string | null {
   try {
-    const url = new URL(value, `${siteConfig.url}/`);
+    const url = new URL(value, absoluteUrl("/"));
     return url.protocol === "http:" || url.protocol === "https:"
       ? url.toString()
       : null;
@@ -86,7 +86,7 @@ export async function GET() {
         ),
         link: new URL(
           `/products/${encodeURIComponent(product.slug)}`,
-          siteConfig.url,
+          absoluteUrl("/"),
         ).toString(),
         imageLink,
         additionalImageLinks: imageLinks.slice(1),
@@ -105,7 +105,7 @@ export async function GET() {
   const xml = buildGoogleMerchantFeed({
     title: `${siteConfig.name} product feed`,
     description: siteConfig.description,
-    link: siteConfig.url,
+    link: absoluteUrl("/"),
     items,
   });
 

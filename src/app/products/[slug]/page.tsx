@@ -11,7 +11,7 @@ import { StockBadge } from "@/components/product/StockBadge";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { FavouriteButton } from "@/components/product/FavouriteButton";
 import { ProductCard } from "@/components/product/ProductCard";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -42,7 +42,7 @@ export async function generateMetadata({
     title: { absolute: title },
     description,
     robots: { index: true, follow: true },
-    alternates: { canonical: `${siteConfig.url}/products/${product.slug}` },
+    alternates: { canonical: absoluteUrl(`/products/${product.slug}`) },
     openGraph: {
       title,
       description,
@@ -103,7 +103,7 @@ export default async function ProductPage({
       : undefined,
     description: product.shortDescription ?? product.description ?? undefined,
     image: product.images.map((image) =>
-      new URL(image.url, `${siteConfig.url}/`).toString(),
+      new URL(image.url, absoluteUrl("/")).toString(),
     ),
     offers: {
       "@type": "Offer",
@@ -111,7 +111,7 @@ export default async function ProductPage({
       price: vat.priceIncVat.toString(),
       availability: getSchemaAvailability(merchantAvailability),
       itemCondition: "https://schema.org/NewCondition",
-      url: `${siteConfig.url}/products/${product.slug}`,
+      url: absoluteUrl(`/products/${product.slug}`),
       shippingDetails: getOfferShippingDetails(),
       hasMerchantReturnPolicy: getOfferMerchantReturnPolicy(),
     },
@@ -121,18 +121,18 @@ export default async function ProductPage({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
       {
         "@type": "ListItem",
         position: 2,
         name: product.category.name,
-        item: `${siteConfig.url}/${product.category.slug}`,
+        item: absoluteUrl(`/${product.category.slug}`),
       },
       {
         "@type": "ListItem",
         position: 3,
         name: product.name,
-        item: `${siteConfig.url}/products/${product.slug}`,
+        item: absoluteUrl(`/products/${product.slug}`),
       },
     ],
   };

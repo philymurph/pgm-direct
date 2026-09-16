@@ -4,7 +4,7 @@ import { getBrandBySlug, getAllProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Pagination } from "@/components/catalog/Pagination";
 import { SortSelect } from "@/components/catalog/SortSelect";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export async function generateMetadata({
   params,
@@ -18,7 +18,7 @@ export async function generateMetadata({
     title: brand.name,
     description:
       brand.description ?? `Shop ${brand.name} products at PGM Direct.`,
-    alternates: { canonical: `${siteConfig.url}/brands/${brand.slug}` },
+    alternates: { canonical: absoluteUrl(`/brands/${brand.slug}`) },
   };
 }
 

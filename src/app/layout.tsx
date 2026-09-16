@@ -4,7 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { returnPolicyConfig, siteConfig } from "@/lib/site";
+import { absoluteUrl, returnPolicyConfig, siteConfig } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       returnPolicyCategory:
         "https://schema.org/MerchantReturnFiniteReturnWindow",
       merchantReturnDays: returnPolicyConfig.consumerReturnDays,
-      merchantReturnLink: `${siteConfig.url}/legal/returns`,
+      merchantReturnLink: absoluteUrl("/legal/returns"),
       returnMethod: "https://schema.org/ReturnByMail",
       returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
       returnLabelSource: "https://schema.org/ReturnLabelCustomerResponsibility",

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getCategoryBySlug } from "@/lib/catalog";
 import { CategoryPageContent } from "@/components/catalog/CategoryPageContent";
-import { siteConfig } from "@/lib/site";
+import { absoluteUrl } from "@/lib/site";
 
 export const revalidate = 300;
 
@@ -19,7 +19,7 @@ export async function generateMetadata({
     title: category.seoTitle ?? category.name,
     description: category.metaDescription ?? category.description ?? undefined,
     alternates: {
-      canonical: `${siteConfig.url}/${category.parent?.slug}/${category.slug}`,
+      canonical: absoluteUrl(`/${category.parent?.slug}/${category.slug}`),
     },
   };
 }

@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSiteSettings } from "@/lib/catalog";
-import { returnPolicyConfig, siteConfig } from "@/lib/site";
+import { absoluteUrl, returnPolicyConfig, siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Returns Policy",
   description:
     "How to cancel an order, return a product, or report faulty or damaged goods purchased from PGM Direct.",
-  alternates: { canonical: `${siteConfig.url}/legal/returns` },
+  alternates: { canonical: absoluteUrl("/legal/returns") },
 };
 
 export default async function ReturnsPage() {
