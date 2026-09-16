@@ -63,7 +63,12 @@ export async function CategoryPageContent({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: absoluteUrl("/"),
+      },
       ...(category.parent
         ? [
             {
@@ -78,7 +83,9 @@ export async function CategoryPageContent({
         "@type": "ListItem",
         position: category.parent ? 3 : 2,
         name: category.name,
-        item: absoluteUrl(`/${category.parent ? `${category.parent.slug}/` : ""}${category.slug}`),
+        item: absoluteUrl(
+          `/${category.parent ? `${category.parent.slug}/` : ""}${category.slug}`,
+        ),
       },
     ],
   };

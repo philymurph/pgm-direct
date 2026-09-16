@@ -2,7 +2,9 @@ const DEFAULT_PROD_URL = "https://pgmdirect.ie";
 
 function normalizeSiteUrl(rawUrl?: string): string {
   const fallback =
-    process.env.NODE_ENV === "production" ? DEFAULT_PROD_URL : "http://localhost:3000";
+    process.env.NODE_ENV === "production"
+      ? DEFAULT_PROD_URL
+      : "http://localhost:3000";
   const value = rawUrl?.trim();
   if (!value) return fallback;
 
