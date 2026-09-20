@@ -23,6 +23,16 @@ import {
 
 export const revalidate = 300;
 
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function truncateForSnippet(value: string, maxLength = 160): string {
+  const normalized = collapseWhitespace(value);
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -35,18 +45,30 @@ export async function generateMetadata({
   const title =
     product.seoTitle ??
     `${product.name} | ${product.mpn ?? product.sku} | ${siteConfig.name}`;
-  const description =
-    product.metaDescription ?? product.shortDescription ?? undefined;
+  const description = truncateForSnippet(
+    product.metaDescription ??
+      `${product.name}${product.mpn ? ` (${product.mpn})` : ""} available from ${siteConfig.name}. ${product.shortDescription ?? product.description ?? ""}`,
+  );
+  const canonicalUrl = absoluteUrl(`/products/${product.slug}`);
 
   return {
     title: { absolute: title },
     description,
     robots: { index: true, follow: true },
-    alternates: { canonical: absoluteUrl(`/products/${product.slug}`) },
+    alternates: { canonical: canonicalUrl },
     openGraph: {
+      type: "product",
+      url: canonicalUrl,
+      siteName: siteConfig.name,
       title,
       description,
       images: product.images[0] ? [{ url: product.images[0].url }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: product.images[0] ? [product.images[0].url] : undefined,
     },
   };
 }
