@@ -57,7 +57,7 @@ export async function generateMetadata({
     robots: { index: true, follow: true },
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      type: "product",
+      type: "website",
       url: canonicalUrl,
       siteName: siteConfig.name,
       title,
