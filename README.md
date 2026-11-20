@@ -17,6 +17,7 @@ IoT hardware and specialist technical products.
 ```
 prisma/
   schema.prisma      All data models (see below)
+  constraints.sql    PostgreSQL constraints not represented in the Prisma schema
   seed.ts            Development seed data (categories, brands, products, VAT rates, admin user)
 src/
   app/               Routes (pages, layouts, API route handlers)
@@ -45,21 +46,25 @@ integration without duplicating logic.
    ```
    npm install
    ```
-2. Start PostgreSQL (a `docker-compose.yml` is included):
+2. Start Docker Desktop (or another Docker runtime), then start PostgreSQL:
    ```
    docker compose up -d
    ```
-   Or point `DATABASE_URL` in `.env` at any PostgreSQL instance.
+   The included Compose service only exposes PostgreSQL on localhost.
+   Or point `DATABASE_URL` in `.env` at an existing development PostgreSQL instance.
 3. Copy the example environment file and fill in real values before going to production:
    ```
    cp .env.example .env
    ```
-4. Run migrations and seed development data:
+4. Create the database schema:
    ```
-   npx prisma migrate dev
-   npm run db:seed
+   npm run db:push
    ```
-   The seed script prints a development admin login (`admin@pgmdirect.ie`) —
+   This also applies PostgreSQL constraints that Prisma cannot express. Run it
+   after schema changes; Prisma may prompt before changes that would lose data.
+   To optionally add demonstration data, run `npm run db:seed`. The seed command
+   loads `.env` through Prisma. It prints a development
+   admin login (`admin@pgmdirect.ie`) when it creates the account —
    **change this password immediately** in any shared environment.
 5. Start the dev server:
    ```
@@ -144,6 +149,88 @@ brands, orders (status/tracking/refunds), customers, delivery, VAT, discounts,
 image uploads, and company settings. Promote a user to admin by setting
 `role = 'ADMIN'` on their `User` row.
 
+**Cable Making** (`/admin/cable-making`) tracks work and payments for one cable
+maker. Add a harness (the default is €1 per pin termination), open Harness Creator to
+prepare a drawing, then use the Work log to record completed batches. The
+add forms open within their sections. Each batch keeps the cable name, pin count,
+and rate used at the time.
+The location summary totals completed batches by their recorded cable name and
+location, including older batches with no location. It is not a current stock
+count. Record payments after they happen and use the summary to check the balance.
+The tracker does not send money or replace the accounting system.
+Each cable type can have one optional image (JPEG, PNG, or WebP, up to 1 MB)
+and one optional PDF (up to 2 MB). Leave either or both file fields blank to
+save without choosing a new file. Use **Preview attachments** in the cable
+list to view an image or PDF without editing the cable type. If the browser
+cannot show PDFs inline, use **Download PDF**. Files are stored in PostgreSQL,
+and only admins can preview or download them.
+
+Under **Connectors and cables**, define reusable connectors with numbered pins,
+and cables with their core colours and optional stripes. Existing parts without
+these details must be edited before selecting them in a new harness. Custom
+colours can be picked or entered as hex values; unspecified colours stay
+unspecified. Editing a part does not change saved harnesses: each selection
+copies its current details into the drawing.
+Connectors and cables can also have an optional JPEG, PNG or WebP image (up to
+1 MB). A harness keeps the image selected when the part is added, even if the
+library image is later replaced or removed. Use **Use library image** in the
+creator to update an existing full harness drawing without changing its wiring,
+then save the drawing. Existing drawings without images stay unchanged.
+
+Open **Harness Creator**, add connector, bare-wire and splice ends, then add
+the cables between them. For each cable core, choose the connector pin, enter
+the bare-wire label or enter a splice group at each end. At a splice, core ends
+with the same group name are joined; each group must have at least two core
+ends. Mark unused cores spare. All cables must form one connected harness.
+The preview and downloadable SVG use symbolic connector housings, bare-wire
+ends and splice markers, and show the chosen core colours. These symbols do not
+represent exact part geometry. The printable build
+sheet lists all connections and colours. Print physical labels separately.
+On the interactive full harness drawing, click a camera marker on a connector,
+cable or harness to view its image. Harness images are managed through the
+harness's optional attachments. Image markers are not included in downloaded
+SVGs or printed sheets. Older simple and advanced drawings still support the
+harness attachment, but do not have per-part image markers.
+
+Each connected connector pin counts as one pin termination per harness;
+spare cores and bare-wire ends are excluded. Saving requires at least one
+connected connector pin and updates the count used for new batches. New harnesses
+require a saved drawing before work can be recorded. Existing manually counted
+types remain usable, and their counts are unchanged until their drawings are
+saved. Previously recorded batches keep their original counts and rates.
+
+Existing simple and advanced drawings continue to open in their original
+editors. The older advanced drawing does not assign individual cable cores
+or printed bare-end labels; specify those separately before manufacture.
+Its W numbers and colours distinguish connections, not physical wire colours.
+Older cable drawings are
+converted in memory to harness segments, preserving leg lengths; check the
+layout before saving. An existing advanced drawing can be replaced with a
+simple build sheet, but its wiring is not copied automatically and is only
+replaced when the new sheet is saved. An old drawing can also be explicitly
+replaced by a new multi-cable harness; wiring is not copied automatically.
+Drawings are schematic, not to scale.
+Use the trash icon to delete a part after confirmation. A part used by a saved
+drawing cannot be deleted until it is removed from each drawing and those
+drawings are saved.
+
+Use the pencil icon to edit cable types, completed batches, and payment records.
+Select **Louise** or **PGM** when recording or editing a batch. Existing batches
+without a location show **Not set** until edited. Batch edits can change the
+date, quantity, and location; earnings still use the original pin count and rate.
+Payment edits update the tracker only.
+The admin-only **Activity log** records successful Cable Making changes from
+when the log was enabled, with the administrator's email and previous and new
+values. It covers parts, harnesses, drawings, work batches, payments and
+attachments, including deletions; it cannot reconstruct earlier changes or
+changes made directly in the database. Attachment entries retain file metadata
+and a SHA-256 fingerprint, not file contents. Entries are retained independently
+of the records and accounts they describe.
+Use the trash icon to delete attachments, completed batches, and payment records after
+confirming. Deleting a cable type removes its attachments and stops it from
+being selected for new batches, but keeps historical work and earnings.
+Deleting a work or payment record updates the balance.
+
 The settings page includes a production-readiness report. Production checkout
 is blocked if required secrets, company details, VAT, shipping, or real product
 media are missing.
@@ -154,11 +241,9 @@ media are missing.
    PostgreSQL database in the same or a nearby region.
 2. Import this repository into Vercel and add every value from `.env.example`
    to the Production environment. Use sandbox Revolut values in Preview.
-3. Apply schema changes to production before routing traffic:
-
-```
-DATABASE_URL="<production-url>" npx prisma migrate deploy
-```
+3. Before production, establish and review a migration strategy that includes
+   the constraints in `prisma/constraints.sql`. `db:push` is intended for
+   development and is not a replacement for reviewed production migrations.
 
 4. Do **not** run `npm run db:seed` in production. It installs demonstration
    products, placeholder documents, a discount, and a known development login.
@@ -214,4 +299,5 @@ npm audit
   never in source control.
 - Serve over HTTPS only (required for secure cookies and Apple Pay/Google Pay).
 - Fill in and clear every blocker shown at `/admin/settings`.
-- Point `DATABASE_URL` at a managed PostgreSQL instance and run `npx prisma migrate deploy`.
+- Point `DATABASE_URL` at a managed PostgreSQL instance and apply reviewed
+  migrations, including the constraints in `prisma/constraints.sql`.

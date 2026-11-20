@@ -645,3 +645,110 @@ model SiteSettings {
 
   updatedAt DateTime @updatedAt
 }
+
+enum CablePartKind {
+  CONNECTOR
+  CABLE_STOCK
+}
+
+model CablePart {
+  id          String        @id @default(cuid())
+  kind        CablePartKind
+  name        String
+  partNumber  String?
+  details     Json?
+  currentImageId String? @unique
+  currentImage CablePartImage? @relation("CurrentPartImage", fields: [currentImageId], references: [id], onDelete: SetNull)
+  images CablePartImage[] @relation("PartImages")
+
+  @@index([kind, name])
+}
+
+model CablePartImage {
+  id          String    @id @default(cuid())
+  partId      String
+  part        CablePart @relation("PartImages", fields: [partId], references: [id], onDelete: Cascade)
+  currentFor  CablePart? @relation("CurrentPartImage")
+  fileName    String
+  contentType String
+  data        Bytes
+
+  @@index([partId])
+}
+
+model CableType {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  pinsPerCable Int
+  pinCountFromDrawing Boolean @default(false)
+  requiresDrawing Boolean @default(false)
+  ratePerPin   Decimal @default(1.00) @db.Decimal(6, 2)
+  wiringDesign Json?
+
+  workEntries CableWork[]
+  attachments CableAttachment[]
+}
+
+enum CableAttachmentKind {
+  IMAGE
+  PDF
+}
+
+model CableAttachment {
+  cableTypeId String
+  cableType   CableType           @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
+  kind        CableAttachmentKind
+  fileName    String
+  contentType String
+  data        Bytes
+
+  @@id([cableTypeId, kind])
+}
+
+enum CableWorkLocation {
+  LOUISE
+  PGM
+}
+
+model CableWork {
+  id           String   @id @default(cuid())
+  completedOn  DateTime @db.Date
+  cableTypeId  String?
+  cableType    CableType? @relation(fields: [cableTypeId], references: [id], onDelete: SetNull)
+  cableName    String
+  location     CableWorkLocation?
+  quantity     Int
+  pinsPerCable Int
+  totalPins    BigInt
+  ratePerPin   Decimal  @db.Decimal(6, 2)
+  earned       Decimal  @db.Decimal(16, 2)
+  createdAt    DateTime @default(now())
+
+  @@index([completedOn, createdAt])
+  @@index([cableTypeId])
+}
+
+model CablePayment {
+  id        String   @id @default(cuid())
+  paidOn    DateTime @db.Date
+  amount    Decimal  @db.Decimal(12, 2)
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([paidOn, createdAt])
+}
+
+model CableAuditEntry {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now())
+  actorId    String
+  actorEmail String
+  action     String
+  entityType String
+  entityId   String
+  entityName String
+  before     Json?
+  after      Json?
+
+  @@index([occurredAt, id])
+}

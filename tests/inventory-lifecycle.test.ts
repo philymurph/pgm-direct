@@ -13,6 +13,23 @@ after(async () => {
   await prisma.$disconnect();
 });
 
+test("cart rejects duplicate products with and without variants", async () => {
+  const fixture = await createProductFixture(1);
+  const cart = await prisma.cart.create({ data: {} });
+  try {
+    const variant = await prisma.productVariant.create({
+      data: { productId: fixture.productId, sku: `TEST-VARIANT-${randomUUID()}`, name: "Test option" },
+    });
+    await prisma.cartItem.create({ data: { cartId: cart.id, productId: fixture.productId } });
+    await assert.rejects(prisma.cartItem.create({ data: { cartId: cart.id, productId: fixture.productId } }), { code: "P2002" });
+    await prisma.cartItem.create({ data: { cartId: cart.id, productId: fixture.productId, variantId: variant.id } });
+    await assert.rejects(prisma.cartItem.create({ data: { cartId: cart.id, productId: fixture.productId, variantId: variant.id } }), { code: "P2002" });
+  } finally {
+    await prisma.cart.delete({ where: { id: cart.id } });
+    await deleteProductFixture(fixture);
+  }
+});
+
 test("only one concurrent checkout can reserve the last unit", async () => {
   const fixture = await createProductFixture(1);
 
