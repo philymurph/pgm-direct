@@ -18,6 +18,7 @@ IoT hardware and specialist technical products.
 prisma/
   schema.prisma      All data models (see below)
   constraints.sql    PostgreSQL constraints not represented in the Prisma schema
+  cable-making-production.sql  One-time additive update for an existing database
   seed.ts            Development seed data (categories, brands, products, VAT rates, admin user)
 src/
   app/               Routes (pages, layouts, API route handlers)
@@ -237,13 +238,28 @@ media are missing.
 
 ## Production deployment (Vercel)
 
-1. Use a Vercel plan that permits commercial use and create a managed
-   PostgreSQL database in the same or a nearby region.
-2. Import this repository into Vercel and add every value from `.env.example`
-   to the Production environment. Use sandbox Revolut values in Preview.
-3. Before production, establish and review a migration strategy that includes
-   the constraints in `prisma/constraints.sql`. `db:push` is intended for
-   development and is not a replacement for reviewed production migrations.
+1. Use a Vercel plan that permits commercial use and a managed PostgreSQL
+   database in the same or a nearby region. Keep the existing database if the
+   application is already live.
+2. Connect this repository to Vercel and configure the Production environment
+   using `.env.example` as a reference. Use sandbox Revolut values in Preview.
+3. For an existing production database that does not yet have Cable Making,
+   back up the database and verify its schema matches the previous deployed
+   version before applying the one-time `prisma/cable-making-production.sql`.
+   It creates only the new Cable Making objects and must be applied before
+   deploying the new application. The script was generated against the
+   repository's previous deployed schema; stop if production differs or if
+   Cable Making objects already exist. From a trusted environment with
+   `DATABASE_URL` securely set to the production database, run:
+
+   ```
+   npx prisma db execute --schema prisma/schema.prisma --file prisma/cable-making-production.sql
+   ```
+
+   Verify the target before running this command. Do not use `db:push` or
+   `--force-reset` on production. The script assumes Cable Making objects do not
+   already exist and does not update Prisma's migration history. Reconcile
+   that history and establish a reviewed migration strategy for future changes.
 
 4. Do **not** run `npm run db:seed` in production. It installs demonstration
    products, placeholder documents, a discount, and a known development login.
@@ -299,5 +315,5 @@ npm audit
   never in source control.
 - Serve over HTTPS only (required for secure cookies and Apple Pay/Google Pay).
 - Fill in and clear every blocker shown at `/admin/settings`.
-- Point `DATABASE_URL` at a managed PostgreSQL instance and apply reviewed
-  migrations, including the constraints in `prisma/constraints.sql`.
+- Apply the appropriate reviewed database update before deploying; establish
+  a migration strategy for subsequent production schema changes.
