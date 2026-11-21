@@ -6,6 +6,7 @@ import {
   deleteCableRecord,
   editCableWork,
   recordCableWork,
+  saveCableTransfer,
   saveCablePayment,
   saveCableType,
   type CableDeleteTarget,
@@ -321,6 +322,35 @@ export function CableWorkForm({ cables, entry, onSaved, onPendingChange }: (
 export function AddCableWorkButton({ cables }: { cables: { id: string; name: string }[] }) {
   return <AddRecordDialog label="Record a completed batch">
     {(onSaved, onPendingChange) => <CableWorkForm cables={cables} onSaved={onSaved} onPendingChange={onPendingChange} />}
+  </AddRecordDialog>;
+}
+
+export function AddCableTransferButton({ cables }: { cables: string[] }) {
+  return <AddRecordDialog label="Transfer cables">
+    {(onSaved, onPendingChange) => <LedgerForm action={saveCableTransfer} label="Record transfer"
+      onSaved={onSaved} onPendingChange={onPendingChange}>
+      <label className="block text-sm font-medium">
+        Cable
+        <select name="cableName" required defaultValue="" className={fieldClass}>
+          <option value="" disabled>Choose a cable</option>
+          {cables.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+      </label>
+      {([["fromLocation", "From"], ["toLocation", "To"]] as const).map(([name, label]) =>
+        <label key={name} className="block text-sm font-medium">
+          {label}
+          <select name={name} required defaultValue="" className={fieldClass}>
+            <option value="" disabled>Choose a location</option>
+            {Object.entries(cableWorkLocationLabels).map(([value, location]) =>
+              <option key={value} value={value}>{location}</option>)}
+          </select>
+        </label>)}
+      <label className="block text-sm font-medium">
+        Quantity
+        <input name="quantity" type="number" step={1} min={1} max={100000} required className={fieldClass} />
+      </label>
+      <p className="text-sm text-slate-600">Transfers do not change completed work or earnings.</p>
+    </LedgerForm>}
   </AddRecordDialog>;
 }
 

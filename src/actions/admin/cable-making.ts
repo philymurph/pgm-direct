@@ -7,10 +7,10 @@ import { requireAdmin } from "@/lib/auth";
 import { cableAttachmentKinds, readCableAttachment } from "@/lib/cable-attachments";
 import {
   cablePaymentSchema,
+  cableTransferSchema,
   cableTypeSchema,
   cableWorkEditSchema,
   cableWorkSchema,
-  cableWorkTotals,
   snapshotCableWork,
 } from "@/lib/cable-making";
 import { prisma } from "@/lib/db";
@@ -18,6 +18,7 @@ import { cableWiringSchema } from "@/lib/cable-wiring";
 import { cablePartSchema } from "@/lib/cable-parts";
 import { deleteCablePart, saveCableWiringDesign } from "@/lib/cable-part-records";
 import { attachmentAuditSnapshot, cableAuditActor, partImageAuditSnapshot, recordCableAudit } from "@/lib/cable-audit";
+import { deleteCableWorkRecord, editCableWorkRecord, recordCableTransfer } from "@/lib/cable-transfers";
 
 export interface CableFormState {
   error?: string;
@@ -210,18 +211,18 @@ export async function editCableWork(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const actor = await cableAuditActor(session.userId);
-  const updated = await prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "CableWork" WHERE "id" = ${id} FOR UPDATE`;
-    if (!locked.length) return false;
-    const before = await tx.cableWork.findUniqueOrThrow({ where: { id } });
-    const after = await tx.cableWork.update({
-      where: { id },
-      data: { ...parsed.data, ...cableWorkTotals(before, parsed.data.quantity) },
-    });
-    await recordCableAudit(tx, actor, { action: "UPDATE", entityType: "WORK", entityId: id, entityName: after.cableName, before, after });
-    return true;
-  });
-  return updated ? saved("Batch updated.") : { error: "Batch no longer exists." };
+  const updated = await editCableWorkRecord(id, parsed.data, actor);
+  if (updated === "transferred") return { error: "This change would remove quantities that have already been transferred. Transfer them back first." };
+  return updated === "updated" ? saved("Batch updated.") : { error: "Batch no longer exists." };
+}
+
+export async function saveCableTransfer(_prev: CableFormState, data: FormData): Promise<CableFormState> {
+  const session = await requireAdmin();
+  const parsed = cableTransferSchema.safeParse(Object.fromEntries(data));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const actor = await cableAuditActor(session.userId);
+  const recorded = await recordCableTransfer(parsed.data, actor);
+  return recorded ? saved("Transfer recorded.") : { error: "The sending location does not have enough recorded cables. Refresh and try again." };
 }
 
 export async function saveCablePayment(
@@ -265,6 +266,11 @@ export async function deleteCableRecord(target: CableDeleteTarget): Promise<Cabl
 
   const { id } = parsed.data;
   const actor = await cableAuditActor(session.userId);
+  if (parsed.data.type === "work") {
+    const result = await deleteCableWorkRecord(id, actor);
+    if (result === "transferred") return { error: "This batch includes quantities that have already been transferred. Transfer them back first." };
+    return result === "deleted" ? saved("Record deleted.") : { error: "That record no longer exists." };
+  }
   if (parsed.data.type === "part") {
     const result = await deleteCablePart(id, actor);
     if ("error" in result) return { error: result.error };
@@ -305,13 +311,6 @@ export async function deleteCableRecord(target: CableDeleteTarget): Promise<Cabl
             before: batch, after: { ...batch, cableTypeId: null },
           });
         }
-        return true;
-      }
-      case "work": {
-        const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "CableWork" WHERE "id" = ${id} FOR UPDATE`;
-        if (!locked.length) return false;
-        const before = await tx.cableWork.delete({ where: { id } });
-        await recordCableAudit(tx, actor, { action: "DELETE", entityType: "WORK", entityId: id, entityName: before.cableName, before });
         return true;
       }
       case "payment": {

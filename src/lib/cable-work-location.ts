@@ -7,9 +7,10 @@ export const cableWorkLocationLabels = {
 
 export function summarizeCableWorkByLocation(
   work: { location: CableWorkLocation | null; cableName: string; quantity: number }[],
+  transfers: { cableName: string; fromLocation: CableWorkLocation; toLocation: CableWorkLocation; quantity: number }[] = [],
 ) {
   const groups = new Map<CableWorkLocation | null, Map<string, number>>();
-  for (const { location, cableName, quantity } of work) {
+  function add(location: CableWorkLocation | null, cableName: string, quantity: number) {
     let cables = groups.get(location);
     if (!cables) {
       cables = new Map();
@@ -17,10 +18,16 @@ export function summarizeCableWorkByLocation(
     }
     cables.set(cableName, (cables.get(cableName) ?? 0) + quantity);
   }
+  for (const { location, cableName, quantity } of work) add(location, cableName, quantity);
+  for (const { cableName, fromLocation, toLocation, quantity } of transfers) {
+    add(fromLocation, cableName, -quantity);
+    add(toLocation, cableName, quantity);
+  }
   const locations: (CableWorkLocation | null)[] = ["LOUISE", "PGM"];
   if (groups.has(null)) locations.push(null);
   return locations.map((location) => {
     const cables = [...(groups.get(location) ?? new Map<string, number>())]
+      .filter(([, quantity]) => quantity !== 0)
       .map(([name, quantity]) => ({ name, quantity }))
       .sort((a, b) => a.name.localeCompare(b.name, "en-IE"));
     return {

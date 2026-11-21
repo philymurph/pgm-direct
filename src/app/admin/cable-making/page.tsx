@@ -8,6 +8,7 @@ import { FullHarnessDrawing } from "@/components/admin/FullHarnessDrawing";
 import { LegacyCableMakingLinks } from "@/components/admin/LegacyCableMakingLinks";
 import {
   AddCablePaymentButton,
+  AddCableTransferButton,
   AddCableTypeButton,
   AddCableWorkButton,
   DeleteCableRecordButton,
@@ -25,6 +26,7 @@ import { savedHarnessDrawing } from "@/lib/saved-harness-drawing";
 
 const numbers = new Intl.NumberFormat("en-IE");
 const dates = new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeZone: "UTC" });
+const transferDates = new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
 function Panel({ id, title, description, children }: { id: string; title: string; description: string; children: ReactNode }) {
   return (
@@ -62,19 +64,23 @@ export default async function CableMakingPage({ searchParams }: {
     ? params.section : "overview";
   const search = typeof params.q === "string" ? params.q.trim() : "";
 
-  const [cables, work, payments] = await prisma.$transaction([
+  const [cables, work, payments, transfers] = await prisma.$transaction([
     prisma.cableType.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, pinsPerCable: true, pinCountFromDrawing: true, requiresDrawing: true, ratePerPin: true, wiringDesign: true, attachments: { select: { kind: true, fileName: true } } },
     }),
     prisma.cableWork.findMany({ orderBy: [{ completedOn: "desc" }, { createdAt: "desc" }] }),
     prisma.cablePayment.findMany({ orderBy: [{ paidOn: "desc" }, { createdAt: "desc" }] }),
+    prisma.cableTransfer.findMany({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
   ], { isolationLevel: "RepeatableRead" });
 
   const earned = work.reduce((total, row) => total.plus(row.earned), toDecimal(0));
   const paid = payments.reduce((total, row) => total.plus(row.amount), toDecimal(0));
   const balance = cableBalance(earned, paid);
-  const locationSummary = summarizeCableWorkByLocation(work);
+  const locationSummary = summarizeCableWorkByLocation(work, transfers);
+  const transferableCables = [...new Set(locationSummary.flatMap((group) =>
+    group.location ? group.cables.filter((cable) => cable.quantity > 0).map((cable) => cable.name) : []))]
+    .sort((a, b) => a.localeCompare(b, "en-IE"));
   const matchingCables = cables.filter((cable) => cable.name.toLowerCase().includes(search.toLowerCase()));
   const summary = [
     { label: "Cables made", value: numbers.format(work.reduce((total, row) => total + row.quantity, 0)) },
@@ -104,15 +110,16 @@ export default async function CableMakingPage({ searchParams }: {
         ))}
       </dl>
 
-      <Panel id="completed-by-location" title="Completed cables by location"
-        description="All-time quantities from the work log, grouped by the recorded location. This is not a current stock count.">
+      <Panel id="completed-by-location" title="Cables by location"
+        description="Completed quantities adjusted for recorded transfers, grouped by the recorded cable name. Sales and other removals are not tracked, so this is not a current stock count.">
+        {transferableCables.length > 0 && <AddCableTransferButton cables={transferableCables} />}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {locationSummary.map((group) => (
-            <section key={group.location ?? "not-set"} aria-label={`${group.label} completed cables`}
+            <section key={group.location ?? "not-set"} aria-label={`${group.label} recorded cables`}
               className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold text-slate-900">{group.label}</h3>
-                <span className="text-sm font-medium text-slate-600">{numbers.format(group.total)} completed</span>
+                <span className="text-sm font-medium text-slate-600">{numbers.format(group.total)} recorded</span>
               </div>
               {group.cables.length ? <ul className="mt-3 divide-y divide-slate-200 text-sm">
                 {group.cables.map((cable) => <li key={cable.name} className="flex items-baseline justify-between gap-3 py-2">
@@ -124,6 +131,19 @@ export default async function CableMakingPage({ searchParams }: {
           ))}
         </div>
         <Link href="/admin/cable-making?section=work" className="inline-block text-sm font-medium text-blue-700 underline">View work log</Link>
+        {transfers.length > 0 && <div className="space-y-2">
+          <h3 className="font-semibold text-slate-900">Transfer history</h3>
+          <LedgerTable headings={["Recorded (UTC)", "Cable", "From", "To", "Quantity", "Recorded by"]}>
+            {transfers.map((transfer) => <tr key={transfer.id}>
+              <td>{transferDates.format(transfer.createdAt)}</td>
+              <td className="break-words">{transfer.cableName}</td>
+              <td>{cableWorkLocationLabels[transfer.fromLocation]}</td>
+              <td>{cableWorkLocationLabels[transfer.toLocation]}</td>
+              <td>{numbers.format(transfer.quantity)}</td>
+              <td className="break-all">{transfer.actorEmail}</td>
+            </tr>)}
+          </LedgerTable>
+        </div>}
       </Panel>
       </>}
 

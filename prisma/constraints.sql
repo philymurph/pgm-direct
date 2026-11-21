@@ -19,4 +19,8 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CablePayment_positive_amount' AND conrelid = '"CablePayment"'::regclass) THEN
         ALTER TABLE "CablePayment" ADD CONSTRAINT "CablePayment_positive_amount" CHECK ("amount" > 0);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CableTransfer_valid_values' AND conrelid = '"CableTransfer"'::regclass) THEN
+        ALTER TABLE "CableTransfer" ADD CONSTRAINT "CableTransfer_valid_values"
+            CHECK ("quantity" > 0 AND "fromLocation" <> "toLocation");
+    END IF;
 END $$;

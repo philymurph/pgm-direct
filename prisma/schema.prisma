@@ -728,6 +728,20 @@ model CableWork {
   @@index([cableTypeId])
 }
 
+model CableTransfer {
+  id           String            @id @default(cuid())
+  cableName    String
+  fromLocation CableWorkLocation
+  toLocation   CableWorkLocation
+  quantity     Int
+  actorId      String
+  actorEmail   String
+  createdAt    DateTime          @default(now())
+
+  @@index([createdAt, id])
+  @@index([cableName])
+}
+
 model CablePayment {
   id        String   @id @default(cuid())
   paidOn    DateTime @db.Date

@@ -5,6 +5,7 @@ import { summarizeCableWorkByLocation } from "../src/lib/cable-work-location";
 import {
   cableBalance,
   cablePaymentSchema,
+  cableTransferSchema,
   cableTypeSchema,
   cableWorkEditSchema,
   cableWorkSchema,
@@ -83,6 +84,30 @@ test("location summary totals recorded batches by historical cable name and incl
   assert.deepEqual(summarizeCableWorkByLocation([]).map(({ label, total }) => ({ label, total })), [
     { label: "Louise", total: 0 }, { label: "PGM", total: 0 },
   ]);
+});
+
+test("transfers adjust location totals without changing unset work", () => {
+  const summary = summarizeCableWorkByLocation([
+    { location: "LOUISE", cableName: "Cable A", quantity: 8 },
+    { location: null, cableName: "Cable A", quantity: 2 },
+  ], [
+    { cableName: "Cable A", fromLocation: "LOUISE", toLocation: "PGM", quantity: 5 },
+    { cableName: "Cable A", fromLocation: "PGM", toLocation: "LOUISE", quantity: 1 },
+  ]);
+  assert.deepEqual(summary.map(({ label, total }) => ({ label, total })), [
+    { label: "Louise", total: 4 }, { label: "PGM", total: 4 }, { label: "Not set", total: 2 },
+  ]);
+});
+
+test("transfer inputs require different supported locations and a positive whole quantity", () => {
+  const input = { cableName: "Cable A", fromLocation: "LOUISE", toLocation: "PGM", quantity: "3" };
+  assert.equal(cableTransferSchema.parse(input).quantity, 3);
+  for (const invalid of [
+    { ...input, toLocation: "LOUISE" },
+    { ...input, fromLocation: "OTHER" },
+    { ...input, quantity: "1.5" },
+    { ...input, quantity: "0" },
+  ]) assert.equal(cableTransferSchema.safeParse(invalid).success, false);
 });
 
 test("cable attachments require the right file signature and fit the upload limits", async () => {

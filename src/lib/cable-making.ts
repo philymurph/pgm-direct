@@ -30,6 +30,15 @@ export const cableWorkEditSchema = z.object({
 
 export const cableWorkSchema = cableWorkEditSchema.extend({ cableTypeId: z.cuid() });
 
+export const cableTransferSchema = z.object({
+  cableName: z.string().min(1).max(100),
+  fromLocation: z.enum(["LOUISE", "PGM"], { error: "Choose a sending location." }),
+  toLocation: z.enum(["LOUISE", "PGM"], { error: "Choose a receiving location." }),
+  quantity: positiveInt(100_000),
+}).refine((value) => value.fromLocation !== value.toLocation, {
+  path: ["toLocation"], message: "Choose a different receiving location.",
+});
+
 export const cablePaymentSchema = z.object({
   paidOn: ledgerDate,
   amount: positiveEuro(10),

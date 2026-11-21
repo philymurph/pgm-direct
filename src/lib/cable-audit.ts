@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export type CableAuditActor = { id: string; email: string };
-type CableAuditEntity = "PART" | "HARNESS" | "DRAWING" | "WORK" | "PAYMENT" | "ATTACHMENT";
+type CableAuditEntity = "PART" | "HARNESS" | "DRAWING" | "WORK" | "PAYMENT" | "ATTACHMENT" | "TRANSFER";
 type CableAuditAction = "CREATE" | "UPDATE" | "DELETE";
 
 export async function cableAuditActor(userId: string): Promise<CableAuditActor> {

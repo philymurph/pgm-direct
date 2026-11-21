@@ -19,6 +19,7 @@ prisma/
   schema.prisma      All data models (see below)
   constraints.sql    PostgreSQL constraints not represented in the Prisma schema
   cable-making-production.sql  One-time additive update for an existing database
+  cable-transfers-production.sql  One-time additive update for location transfers
   seed.ts            Development seed data (categories, brands, products, VAT rates, admin user)
 src/
   app/               Routes (pages, layouts, API route handlers)
@@ -160,8 +161,14 @@ for details or open Harness Creator to edit it.
 The add buttons open a dialog for each form. Each batch keeps the cable name, pin count,
 and rate used at the time.
 The location summary totals completed batches by their recorded cable name and
-location, including older batches with no location. It is not a current stock
-count. Record payments after they happen and use the summary to check the balance.
+location, adjusted for recorded transfers. Older batches without a location stay
+under **Not set**. Use **Transfer cables** to move recorded quantities between
+Louise and PGM; transfer history and Activity record each transaction. The
+recorded quantity excludes sales and other removals, so it is not a current
+stock count. Transfer quantities are limited to the sending location's recorded
+quantity. Work cannot be edited or deleted if doing so would make a recorded
+location quantity negative; transfer cables back first. Record payments after
+they happen and use the summary to check the balance.
 The tracker does not send money or replace the accounting system.
 Each cable type can have one optional image (JPEG, PNG, or WebP, up to 1 MB)
 and one optional PDF (up to 2 MB). Leave either or both file fields blank to
@@ -265,6 +272,12 @@ media are missing.
    `--force-reset` on production. The script assumes Cable Making objects do not
    already exist and does not update Prisma's migration history. Reconcile
    that history and establish a reviewed migration strategy for future changes.
+
+   For an existing database that already has Cable Making, back it up and apply
+   `prisma/cable-transfers-production.sql` once before deploying the transfer
+   feature. This additive transaction creates the transfer table and constraints;
+   verify that it does not already exist. For a database without Cable Making,
+   apply the Cable Making update first, then the transfer update.
 
 4. Do **not** run `npm run db:seed` in production. It installs demonstration
    products, placeholder documents, a discount, and a known development login.

@@ -9,7 +9,7 @@ const dates = new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle:
 const actions: Record<string, string> = { CREATE: "Created", UPDATE: "Updated", DELETE: "Deleted" };
 const entities: Record<string, string> = {
   PART: "part", HARNESS: "harness", DRAWING: "drawing", WORK: "work batch",
-  PAYMENT: "payment", ATTACHMENT: "attachment",
+  PAYMENT: "payment", ATTACHMENT: "attachment", TRANSFER: "transfer",
 };
 
 export default async function CableActivityPage({ searchParams }: {
