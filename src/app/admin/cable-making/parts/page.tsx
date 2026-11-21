@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AddCablePartButton, EditCablePartButton } from "@/components/admin/CablePartForm";
@@ -32,8 +33,14 @@ export default async function CablePartsPage() {
               <p className="text-sm text-slate-600">{part.partNumber && `${part.partNumber} · `}
                 {part.kind === "CONNECTOR" ? part.pinCount ? `${part.pinCount} pins` : "Pin count not set" :
                   part.cores ? `${part.cores.length} cores` : "Core details not set"}</p>
-              {part.imageId && <a className="text-sm text-blue-700 underline" target="_blank" rel="noreferrer"
-                href={`/admin/cable-making/parts/${part.id}/images/${part.imageId}`}>View image</a>}
+              {part.imageId && <a className="mt-2 inline-block text-sm text-blue-700 underline" target="_blank" rel="noreferrer"
+                href={`/admin/cable-making/parts/${part.id}/images/${part.imageId}`} aria-label={`View image: ${part.name}`}>
+                <span className="relative mb-1 block h-28 w-36 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                  <Image unoptimized fill src={`/admin/cable-making/parts/${part.id}/images/${part.imageId}`}
+                    alt="" sizes="144px" className="object-contain" />
+                </span>
+                View image
+              </a>}
               <div className="mt-2 flex gap-1">
                 <EditCablePartButton part={part} />
                 <DeleteCableRecordButton target={{ type: "part", id: part.id }} label={`Delete ${part.name}`}

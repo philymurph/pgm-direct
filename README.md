@@ -177,7 +177,8 @@ colours can be picked or entered as hex values; unspecified colours stay
 unspecified. Editing a part does not change saved harnesses: each selection
 copies its current details into the drawing.
 Connectors and cables can also have an optional JPEG, PNG or WebP image (up to
-1 MB). A harness keeps the image selected when the part is added, even if the
+1 MB). Their cards show a small preview that opens the full image. A harness
+keeps the image selected when the part is added, even if the
 library image is later replaced or removed. Use **Use library image** in the
 creator to update an existing full harness drawing without changing its wiring,
 then save the drawing. Existing drawings without images stay unchanged.
