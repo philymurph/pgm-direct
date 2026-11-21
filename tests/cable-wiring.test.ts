@@ -93,6 +93,8 @@ test("full harness drawing shows connectors, coloured wires, spares and splice a
   const svg = fullHarnessSvg("Harness <test>", design);
   assert.match(svg, /Harness &lt;test&gt;/);
   assert.match(svg, /aria-label="Connector housing"/);
+  assert.match(svg, /END 1 · CONNECTOR/);
+  assert.match(svg, /END 2 · SPLICE/);
   assert.match(svg, /Pin 1/);
   assert.match(svg, /Pin 2/);
   assert.match(svg, /Group signal/);
@@ -100,8 +102,13 @@ test("full harness drawing shows connectors, coloured wires, spares and splice a
   assert.match(svg, /stroke="#1761c9" stroke-width="8"/);
   assert.match(svg, /stroke="#ffffff" stroke-width="8" stroke-dasharray="12 16"/);
   assert.match(svg, /Spare - not connected/);
-  assert.match(svg, /x1="312"[^>]+x2="888"[^>]+stroke-dasharray="14 8"/);
+  assert.match(svg, /x1="312"[^>]+x2="888"[^>]+stroke-dasharray="14 14"/);
   assert.match(svg, new RegExp(`viewBox="0 0 1200 ${fullHarnessSvgHeight(design)}"`));
+  const stripedSpare = fullHarnessSchema.parse({ ...branched, segments: [
+    { ...branched.segments[0], cores: [branched.segments[0].cores[0], { ...branched.segments[0].cores[1], stripeColour: "#ffffff" }] },
+    ...branched.segments.slice(1),
+  ] });
+  assert.match(fullHarnessSvg("Striped spare", stripedSpare), /x1="312"[^>]+x2="888"[^>]+stroke="#ffffff"[^>]+stroke-dasharray="7 21"/);
 });
 
 test("image markers are placed on their cable and connector, not on bare or splice ends", () => {
@@ -116,6 +123,29 @@ test("image markers are placed on their cable and connector, not on bare or spli
     assert.ok(target.x >= 0 && target.x + target.width <= 1200);
     assert.ok(target.y >= 0 && target.y + target.height <= fullHarnessSvgHeight(design));
   }
+  const firstCoreY = Number(fullHarnessSvg("Test", design).match(/x="335" y="(\d+)"[^>]*>Core 1:/)?.[1]);
+  assert.ok(firstCoreY - targets[1].y >= 50, "camera marker does not cover the first core label");
+});
+
+test("the largest full harness drawing keeps all core and long end labels within each segment", () => {
+  const name = "Long & ".repeat(5);
+  const design = fullHarnessSchema.parse({
+    version: 4,
+    ends: [
+      { type: "CONNECTOR", name, partId: "clh0000000000000000000001", pinCount: 40 },
+      { type: "BARE", name },
+    ],
+    segments: [{ cableSpec: "Long cable", stockPartId: "clh0000000000000000000003", from: 0, to: 1, lengthMm: 500,
+      cores: Array.from({ length: 40 }, (_, index) => ({ spare: false, from: String(index + 1), to: `Label ${index + 1}` })) }],
+  });
+  const svg = fullHarnessSvg("Maximum", design);
+  assert.match(svg, /Pin 40/);
+  assert.match(svg, /Label: Label 40/);
+  assert.match(svg, /Core 40: Colour not specified/);
+  assert.match(svg, /Long &amp; /);
+  const last = svg.match(/x="335" y="(\d+)"[^>]*>Core 40:/);
+  assert.ok(last && Number(last[1]) < fullHarnessSvgHeight(design) - 33);
+  assert.doesNotMatch(svg, /NaN|Infinity/);
 });
 
 test("simple build sheet preserves pin-to-core mappings and printed bare-end labels", () => {

@@ -3,14 +3,14 @@ import { coreColourDescription } from "./core-colours";
 import type { FullHarness } from "./full-harness";
 
 const width = 1200;
-const rowHeight = 58;
-const segmentHeight = (segment: FullHarness["segments"][number]) => 144 + segment.cores.length * rowHeight;
+const rowHeight = 66;
+const segmentHeight = (segment: FullHarness["segments"][number]) => 190 + segment.cores.length * rowHeight;
 
 export function fullHarnessImageTargets(design: FullHarness) {
   let top = 70;
   return design.segments.flatMap((segment, index) => {
-    const bodyTop = top + 92;
-    const bodyHeight = segment.cores.length * rowHeight + 10;
+    const bodyTop = top + 114;
+    const bodyHeight = segment.cores.length * rowHeight + 44;
     const targets = [
       ...(segment.imageId ? [{ partId: segment.stockPartId, imageId: segment.imageId, label: `Cable ${index + 1}: ${segment.cableSpec}`, x: 40, y: top + 3, width: 1120, height: 37 }] : []),
       ...([["from", true], ["to", false]] as const).flatMap(([side, left]) => {
@@ -39,8 +39,8 @@ export function fullHarnessSvg(name: string, design: FullHarness) {
     const from = design.ends[segment.from];
     const to = design.ends[segment.to];
     const cardHeight = segmentHeight(segment) - 16;
-    const bodyTop = top + 92;
-    const bodyHeight = segment.cores.length * rowHeight + 10;
+    const bodyTop = top + 114;
+    const bodyHeight = segment.cores.length * rowHeight + 44;
     const housing = (end: FullHarness["ends"][number], left: boolean) => {
       if (end.type !== "CONNECTOR") return "";
       const x = left ? 42 : 918;
@@ -53,8 +53,9 @@ export function fullHarnessSvg(name: string, design: FullHarness) {
       const labelX = left ? 72 : 958;
       if (spare) return text(labelX, y + 6, "Spare - not connected", 16, 185);
       if (end.type === "CONNECTOR") {
-        return `<circle cx="${x}" cy="${y}" r="8" fill="#fff" stroke="#334155" stroke-width="2"/>` +
-          text(labelX, y + 6, `Pin ${value}`, 17, 180, 700);
+        return `<rect x="${labelX - 8}" y="${y - 19}" width="112" height="38" rx="8" fill="#fff" stroke="#cbd5e1"/>` +
+          `<circle cx="${x}" cy="${y}" r="9" fill="#fff" stroke="#1e3a5f" stroke-width="3"/>` +
+          text(labelX + 5, y + 6, `Pin ${value}`, 18, 96, 700);
       }
       if (end.type === "SPLICE") {
         return `<path d="M ${x - 11} ${y} l 11 -10 11 10 -11 10 Z" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>` +
@@ -65,20 +66,22 @@ export function fullHarnessSvg(name: string, design: FullHarness) {
         text(left ? 50 : 959, y + 6, `Label: ${value}`, 16, 185, 700);
     };
     const rows = segment.cores.map((core, coreIndex) => {
-      const y = bodyTop + 34 + coreIndex * rowHeight;
+      const y = bodyTop + 72 + coreIndex * rowHeight;
       const start = core.spare ? 312 : 282;
       const end = core.spare ? 888 : 918;
-      const dash = core.spare ? ' stroke-dasharray="14 8"' : "";
+      const dash = core.spare ? ' stroke-dasharray="14 14"' : "";
       const wire = `<line x1="${start}" y1="${y}" x2="${end}" y2="${y}" stroke="#475569" stroke-width="12" stroke-linecap="round"${dash}/>` +
         (core.colour ? `<line x1="${start}" y1="${y}" x2="${end}" y2="${y}" stroke="${core.colour}" stroke-width="8" stroke-linecap="round"${dash}/>` : "") +
-        (core.stripeColour ? `<line x1="${start}" y1="${y}" x2="${end}" y2="${y}" stroke="${core.stripeColour}" stroke-width="8" stroke-dasharray="${core.spare ? "7 15" : "12 16"}"/>` : "");
-      return text(375, y - 14, `Core ${coreIndex + 1}: ${coreColourDescription(core.colour, core.stripeColour)}${core.spare ? " (spare)" : ""}`, 15, 450) +
+        (core.stripeColour ? `<line x1="${start}" y1="${y}" x2="${end}" y2="${y}" stroke="${core.stripeColour}" stroke-width="8" stroke-dasharray="${core.spare ? "7 21" : "12 16"}"/>` : "");
+      return text(335, y - 16, `Core ${coreIndex + 1}: ${coreColourDescription(core.colour, core.stripeColour)}${core.spare ? " (spare)" : ""}`, 18, 530, 600) +
         wire + endpoint(from, core.from, y, true, core.spare) + endpoint(to, core.to, y, false, core.spare);
     }).join("");
+    const endHeading = (end: FullHarness["ends"][number], endIndex: number, x: number, maxWidth: number) =>
+      text(x, top + 60, `END ${endIndex + 1} · ${end.type === "CONNECTOR" ? "CONNECTOR" : end.type === "SPLICE" ? "SPLICE" : "BARE WIRES"}`, 14, maxWidth, 700) +
+      text(x, top + 87, end.name, 19, maxWidth, 700);
     const segmentSvg = `<rect x="16" y="${top}" width="1168" height="${cardHeight}" rx="15" fill="#fff" stroke="#cbd5e1"/>` +
-      text(40, top + 30, `Cable ${index + 1}: ${segment.cableSpec}${segment.partNumber ? ` (${segment.partNumber})` : ""} / ${segment.lengthMm} mm`, 20, 1120, 700) +
-      text(42, top + 61, `End ${segment.from + 1}: ${from.name}`, 17, 510, 700) +
-      text(685, top + 61, `End ${segment.to + 1}: ${to.name}`, 17, 470, 700) +
+      text(40, top + 30, `Cable ${index + 1}: ${segment.cableSpec}${segment.partNumber ? ` (${segment.partNumber})` : ""} / ${segment.lengthMm} mm`, 20, 1040, 700) +
+      endHeading(from, segment.from, 42, 500) + endHeading(to, segment.to, 685, 470) +
       housing(from, true) + housing(to, false) + rows;
     top += segmentHeight(segment);
     return segmentSvg;

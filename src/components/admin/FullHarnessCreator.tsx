@@ -165,33 +165,61 @@ export function FullHarnessCreator({ id, name, initial, parts, hasHarnessImage }
       {valid.success && <div className="flex flex-wrap gap-3"><button type="button" className={button} onClick={() => window.print()}>Print build sheet</button>
         {svg && <a className={button} href={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`} download="harness-build-sheet.svg">Download drawing</a>}</div>}
     </div>
-    {valid.success && <section id="full-harness-sheet" className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-      <h2 className="text-lg font-semibold">{name} build sheet</h2>
-      <p className="text-sm">{connectorPinTerminations(valid.data)} connector pin terminations. Print physical wire labels separately.</p>
-      <ul className="text-sm">{valid.data.ends.map((end, i) => <li key={i}>
-        End {i + 1}: {end.name}{end.type === "CONNECTOR" ? ` · ${end.pinCount} pins${end.partNumber ? ` · ${end.partNumber}` : ""}` : end.type === "SPLICE" ? " · splice" : " · bare wires"}
-      </li>)}</ul>
-      {svg && <div className="overflow-x-auto print:hidden">
-        <p className="mb-2 text-sm text-slate-600">Click a camera marker to view its image. Save the drawing to keep image changes.</p>
-        <FullHarnessDrawing id={id} name={name} design={valid.data} svg={svg} hasHarnessImage={hasHarnessImage} />
+    {valid.success && <section id="full-harness-sheet" className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <header className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Harness build sheet</p>
+        <h2 className="break-words text-xl font-bold text-slate-900">{name}</h2>
+        <p className="text-sm text-slate-600">{connectorPinTerminations(valid.data)} connector pin terminations · Print physical wire labels separately.</p>
+      </header>
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-slate-900">Harness ends</h3>
+        <ul className="grid gap-2 sm:grid-cols-2">{valid.data.ends.map((end, i) => <li key={i} className="sheet-end rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">End {i + 1} · {end.type === "CONNECTOR" ? "Connector" : end.type === "SPLICE" ? "Splice" : "Bare wires"}</span>
+          <span className="mt-1 block break-words font-semibold text-slate-900">{end.name}</span>
+          {end.type === "CONNECTOR" && <span className="block text-slate-600">{end.pinCount} pins{end.partNumber ? ` · ${end.partNumber}` : ""}</span>}
+        </li>)}</ul>
+      </div>
+      {svg && <div className="print:hidden">
+        <h3 className="text-base font-semibold text-slate-900">Wiring diagram</h3>
+        <p className="mb-3 mt-1 text-sm text-slate-600">Click a camera marker to view its image. Save the drawing to keep image changes.</p>
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <FullHarnessDrawing id={id} name={name} design={valid.data} svg={svg} hasHarnessImage={hasHarnessImage} />
+        </div>
       </div>}
-      {valid.data.segments.map((segment, index) => <div key={index} className="space-y-2">
-        <h3 className="font-semibold">Cable {index + 1}: {segment.cableSpec}{segment.partNumber ? ` (${segment.partNumber})` : ""} · {segment.lengthMm} mm</h3>
-        <table className="w-full text-left text-sm"><thead><tr><th>Core</th><th>End {segment.from + 1}: {valid.data.ends[segment.from].name}</th><th>End {segment.to + 1}: {valid.data.ends[segment.to].name}</th></tr></thead>
-          <tbody>{segment.cores.map((core, i) => <tr key={i} className="border-t border-slate-200">
-            <td className="py-2"><span className="mr-2 inline-block h-3 w-6 border border-slate-500" style={{ backgroundColor: core.colour ?? "transparent", backgroundImage: core.stripeColour ? `repeating-linear-gradient(45deg, transparent 0 6px, ${core.stripeColour} 6px 10px)` : undefined }} />
-              {i + 1}: {coreColourDescription(core.colour, core.stripeColour)}</td>
-            <td>{core.spare ? "Spare" : description(valid.data.ends[segment.from], core.from)}</td>
-            <td>{core.spare ? "Not connected" : description(valid.data.ends[segment.to], core.to)}</td>
-          </tr>)}</tbody></table>
-      </div>)}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">Wiring schedule</h3>
+          <p className="mt-1 text-sm text-slate-600">Connections are listed for each cable core. Spare cores are not connected.</p>
+        </div>
+        {valid.data.segments.map((segment, index) => <div key={index} className="space-y-2">
+          <h4 className="break-words font-semibold text-slate-900">Cable {index + 1}: {segment.cableSpec}{segment.partNumber ? ` (${segment.partNumber})` : ""} · {segment.lengthMm} mm</h4>
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full min-w-[34rem] text-left text-sm print:min-w-0">
+              <thead className="bg-slate-100 text-slate-700"><tr>
+                <th scope="col" className="px-3 py-2">Core</th>
+                <th scope="col" className="px-3 py-2">End {segment.from + 1}: {valid.data.ends[segment.from].name}</th>
+                <th scope="col" className="px-3 py-2">End {segment.to + 1}: {valid.data.ends[segment.to].name}</th>
+              </tr></thead>
+              <tbody>{segment.cores.map((core, i) => <tr key={i} className="border-t border-slate-200">
+                <td className="px-3 py-2"><span aria-hidden="true" className="sheet-colour mr-2 inline-block h-3 w-6 border border-slate-500" style={{ backgroundColor: core.colour ?? "transparent", backgroundImage: core.stripeColour ? `repeating-linear-gradient(45deg, transparent 0 6px, ${core.stripeColour} 6px 10px)` : undefined }} />
+                  {i + 1}: {coreColourDescription(core.colour, core.stripeColour)}</td>
+                <td className="px-3 py-2">{core.spare ? "Spare" : description(valid.data.ends[segment.from], core.from)}</td>
+                <td className="px-3 py-2">{core.spare ? "Not connected" : description(valid.data.ends[segment.to], core.to)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </div>)}
+      </div>
     </section>}
     <style>{`@media print {
       body:has(#full-harness-sheet) *:not(:has(#full-harness-sheet)):not(#full-harness-sheet):not(#full-harness-sheet *) { display: none !important; }
       body:has(#full-harness-sheet) *:has(#full-harness-sheet) { display: block !important; position: static !important; width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; }
       #full-harness-sheet { display: block !important; width: 100%; color: #000; font-size: 11pt; }
-      #full-harness-sheet h2 { font-size: 16pt; font-weight: bold; margin-bottom: 12pt; }
-      #full-harness-sheet h3 { margin-top: 12pt; }
+      #full-harness-sheet h2 { font-size: 16pt; font-weight: bold; margin-bottom: 8pt; }
+      #full-harness-sheet h3 { font-size: 13pt; margin-top: 12pt; }
+      #full-harness-sheet h4 { font-size: 11pt; margin-top: 12pt; break-after: avoid; overflow-wrap: anywhere; }
+      #full-harness-sheet .sheet-end { break-inside: avoid; overflow-wrap: anywhere; }
+      #full-harness-sheet .sheet-colour { print-color-adjust: exact; }
       #full-harness-sheet table { width: 100%; border-collapse: collapse; margin: 8pt 0; table-layout: fixed; }
       #full-harness-sheet th, #full-harness-sheet td { border: 1px solid #444; padding: 6pt; text-align: left; overflow-wrap: anywhere; }
       #full-harness-sheet thead { display: table-header-group; }
