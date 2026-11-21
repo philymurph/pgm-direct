@@ -164,7 +164,10 @@ The location summary totals completed batches by their recorded cable name and
 location, adjusted for recorded transfers. Older batches without a location stay
 under **Not set**. Use **Transfer cables** to move recorded quantities between
 Louise and PGM; transfer history and Activity record each transaction. The
-recorded quantity excludes sales and other removals, so it is not a current
+delete action in transfer history reverses its recorded quantities and records
+the deletion in Activity. Deletion is blocked if the receiving location no
+longer has enough recorded quantity; delete or reverse later transfers first.
+The recorded quantity excludes sales and other removals, so it is not a current
 stock count. Transfer quantities are limited to the sending location's recorded
 quantity. Work cannot be edited or deleted if doing so would make a recorded
 location quantity negative; transfer cables back first. Record payments after

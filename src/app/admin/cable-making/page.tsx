@@ -133,7 +133,7 @@ export default async function CableMakingPage({ searchParams }: {
         <Link href="/admin/cable-making?section=work" className="inline-block text-sm font-medium text-blue-700 underline">View work log</Link>
         {transfers.length > 0 && <div className="space-y-2">
           <h3 className="font-semibold text-slate-900">Transfer history</h3>
-          <LedgerTable headings={["Recorded (UTC)", "Cable", "From", "To", "Quantity", "Recorded by"]}>
+          <LedgerTable headings={["Recorded (UTC)", "Cable", "From", "To", "Quantity", "Recorded by", "Actions"]}>
             {transfers.map((transfer) => <tr key={transfer.id}>
               <td>{transferDates.format(transfer.createdAt)}</td>
               <td className="break-words">{transfer.cableName}</td>
@@ -141,6 +141,9 @@ export default async function CableMakingPage({ searchParams }: {
               <td>{cableWorkLocationLabels[transfer.toLocation]}</td>
               <td>{numbers.format(transfer.quantity)}</td>
               <td className="break-all">{transfer.actorEmail}</td>
+              <td><DeleteCableRecordButton target={{ type: "transfer", id: transfer.id }}
+                label={`Delete transfer of ${numbers.format(transfer.quantity)} ${transfer.cableName} from ${cableWorkLocationLabels[transfer.fromLocation]} to ${cableWorkLocationLabels[transfer.toLocation]}, recorded ${transferDates.format(transfer.createdAt)} UTC`}
+                confirmation={`Delete this transfer of ${numbers.format(transfer.quantity)} "${transfer.cableName}" from ${cableWorkLocationLabels[transfer.fromLocation]} to ${cableWorkLocationLabels[transfer.toLocation]}? This reverses the recorded location quantities, but does not physically move the cables.`} /></td>
             </tr>)}
           </LedgerTable>
         </div>}

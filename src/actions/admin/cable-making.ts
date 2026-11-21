@@ -18,7 +18,7 @@ import { cableWiringSchema } from "@/lib/cable-wiring";
 import { cablePartSchema } from "@/lib/cable-parts";
 import { deleteCablePart, saveCableWiringDesign } from "@/lib/cable-part-records";
 import { attachmentAuditSnapshot, cableAuditActor, partImageAuditSnapshot, recordCableAudit } from "@/lib/cable-audit";
-import { deleteCableWorkRecord, editCableWorkRecord, recordCableTransfer } from "@/lib/cable-transfers";
+import { deleteCableTransferRecord, deleteCableWorkRecord, editCableWorkRecord, recordCableTransfer } from "@/lib/cable-transfers";
 
 export interface CableFormState {
   error?: string;
@@ -252,6 +252,7 @@ export async function saveCablePayment(
 const deleteTargetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("cable"), id: z.cuid() }),
   z.object({ type: z.literal("work"), id: z.cuid() }),
+  z.object({ type: z.literal("transfer"), id: z.cuid() }),
   z.object({ type: z.literal("payment"), id: z.cuid() }),
   z.object({ type: z.literal("attachment"), id: z.cuid(), kind: z.enum(cableAttachmentKinds) }),
   z.object({ type: z.literal("part"), id: z.cuid() }),
@@ -266,6 +267,11 @@ export async function deleteCableRecord(target: CableDeleteTarget): Promise<Cabl
 
   const { id } = parsed.data;
   const actor = await cableAuditActor(session.userId);
+  if (parsed.data.type === "transfer") {
+    const result = await deleteCableTransferRecord(id, actor);
+    if (result === "insufficient") return { error: "Deleting this transfer would make the receiving location's quantity negative. Delete or reverse later transfers, or transfer enough cables back to that location first." };
+    return result === "deleted" ? saved("Transfer deleted.") : { error: "That transfer no longer exists." };
+  }
   if (parsed.data.type === "work") {
     const result = await deleteCableWorkRecord(id, actor);
     if (result === "transferred") return { error: "This batch includes quantities that have already been transferred. Transfer them back first." };

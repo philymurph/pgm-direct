@@ -28,6 +28,18 @@ export async function recordCableTransfer(data: z.output<typeof cableTransferSch
   });
 }
 
+export async function deleteCableTransferRecord(id: string, actor: CableAuditActor) {
+  return prisma.$transaction(async (tx) => {
+    await lockLocations(tx);
+    const before = await tx.cableTransfer.findUnique({ where: { id } });
+    if (!before) return "missing";
+    if (await availableQuantity(tx, before.cableName, before.toLocation) < before.quantity) return "insufficient";
+    await tx.cableTransfer.delete({ where: { id } });
+    await recordCableAudit(tx, actor, { action: "DELETE", entityType: "TRANSFER", entityId: id, entityName: before.cableName, before });
+    return "deleted";
+  });
+}
+
 export async function editCableWorkRecord(id: string, data: z.output<typeof cableWorkEditSchema>, actor: CableAuditActor) {
   return prisma.$transaction(async (tx) => {
     await lockLocations(tx);
