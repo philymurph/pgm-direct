@@ -3,7 +3,9 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { CableAttachmentPreviews } from "@/components/admin/CableAttachmentPreviews";
+import { CableMakingNav } from "@/components/admin/CableMakingNav";
 import { FullHarnessDrawing } from "@/components/admin/FullHarnessDrawing";
+import { LegacyCableMakingLinks } from "@/components/admin/LegacyCableMakingLinks";
 import {
   CablePaymentForm,
   CableTypeForm,
@@ -58,10 +60,16 @@ function LedgerTable({ headings, children }: { headings: string[]; children: Rea
   );
 }
 
-export default async function CableMakingPage() {
+export default async function CableMakingPage({ searchParams }: {
+  searchParams: Promise<{ section?: string | string[]; q?: string | string[] }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/account/login");
   if (session.role !== "ADMIN") redirect("/");
+  const params = await searchParams;
+  const section = params.section === "harnesses" || params.section === "work" || params.section === "payments"
+    ? params.section : "overview";
+  const search = typeof params.q === "string" ? params.q.trim() : "";
 
   const [cables, work, payments] = await prisma.$transaction([
     prisma.cableType.findMany({
@@ -76,6 +84,7 @@ export default async function CableMakingPage() {
   const paid = payments.reduce((total, row) => total.plus(row.amount), toDecimal(0));
   const balance = cableBalance(earned, paid);
   const locationSummary = summarizeCableWorkByLocation(work);
+  const matchingCables = cables.filter((cable) => cable.name.toLowerCase().includes(search.toLowerCase()));
   const summary = [
     { label: "Cables made", value: numbers.format(work.reduce((total, row) => total + row.quantity, 0)) },
     { label: "Pin terminations", value: numbers.format(work.reduce((total, row) => total + row.totalPins, BigInt(0))) },
@@ -86,20 +95,15 @@ export default async function CableMakingPage() {
 
   return (
     <div className="space-y-6">
+      <LegacyCableMakingLinks />
       <header className="rounded-xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Admin workspace</p>
         <h1 className="text-2xl font-bold text-slate-900">Cable Making</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">Define connectors and cables, assemble harnesses, then record completed work and payments.</p>
-        <nav aria-label="Cable making sections" className="mt-4 flex flex-wrap gap-2 text-sm font-medium">
-          <Link href="/admin/cable-making/parts#connectors" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">1. Connectors</Link>
-          <Link href="/admin/cable-making/parts#cables" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">2. Cables</Link>
-          <a href="#cable-types" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">3. Harnesses</a>
-          <a href="#work-log" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">Work log</a>
-          <a href="#payments" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">Payments</a>
-          <Link href="/admin/cable-making/activity" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100">Activity log</Link>
-        </nav>
+        <div className="mt-4"><CableMakingNav active={section} /></div>
       </header>
 
+      {section === "overview" && <>
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         {summary.map(({ label, value }) => (
           <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -128,15 +132,26 @@ export default async function CableMakingPage() {
             </section>
           ))}
         </div>
-        <a href="#work-log" className="inline-block text-sm font-medium text-blue-700 underline">View work log</a>
+        <Link href="/admin/cable-making?section=work" className="inline-block text-sm font-medium text-blue-700 underline">View work log</Link>
       </Panel>
+      </>}
 
-      <Panel id="cable-types" title="Harnesses" description="Add a harness, then choose its connectors and cables in Harness Creator. Rate changes apply only to new work.">
+      {section === "harnesses" && <Panel id="cable-types" title="Harnesses" description="Add a harness, then choose its connectors and cables in Harness Creator. Rate changes apply only to new work.">
           <div className="flex flex-wrap gap-3 text-sm"><Link className="text-blue-700 underline" href="/admin/cable-making/parts#connectors">Manage connectors</Link><Link className="text-blue-700 underline" href="/admin/cable-making/parts#cables">Manage cables</Link></div>
           <AddForm title="Add a harness" open={cables.length === 0}><CableTypeForm /></AddForm>
-          {cables.length === 0 ? <p className="text-sm text-slate-600">No harnesses yet. Add one to create a drawing.</p> : (
+          {cables.length > 0 && <form action="/admin/cable-making" className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="section" value="harnesses" />
+            <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">Search harnesses
+              <input type="search" name="q" defaultValue={search} placeholder="Search by harness name"
+                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2" />
+            </label>
+            <button type="submit" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Search</button>
+            {search && <Link href="/admin/cable-making?section=harnesses" className="px-2 py-2 text-sm font-medium text-blue-700 underline">Clear</Link>}
+          </form>}
+          {cables.length === 0 ? <p className="text-sm text-slate-600">No harnesses yet. Add one to create a drawing.</p> : matchingCables.length === 0
+            ? <p className="text-sm text-slate-600">No harnesses match your search.</p> : (
           <div className="grid gap-3">
-          {cables.map((cable) => {
+          {matchingCables.map((cable) => {
             const drawing = savedHarnessDrawing(cable.name, cable.wiringDesign);
             return (
             <div key={cable.id} className="space-y-3 rounded-lg border border-slate-200 p-4">
@@ -159,9 +174,9 @@ export default async function CableMakingPage() {
               <Link href={`/admin/cable-making/${cable.id}/creator`} className="inline-block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                 Open Harness Creator
               </Link>
-              {drawing && (drawing.success ? <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-slate-900">Saved wiring drawing</h4>
-                <div className="max-h-96 overflow-auto rounded-md border border-slate-200" tabIndex={0} aria-label={`${cable.name} saved drawing, scrollable`}>
+              {drawing && (drawing.success ? <details>
+                <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:underline">Show saved wiring drawing</summary>
+                <div className="mt-2 max-h-96 overflow-auto rounded-md border border-slate-200" tabIndex={0} aria-label={`${cable.name} saved drawing, scrollable`}>
                   {drawing.design.version === 4
                     ? <FullHarnessDrawing id={cable.id} name={cable.name} design={drawing.design} svg={drawing.svg}
                       hasHarnessImage={cable.attachments.some((attachment) => attachment.kind === "IMAGE")} />
@@ -169,19 +184,19 @@ export default async function CableMakingPage() {
                       alt={`${cable.name} saved wiring drawing`} width={CABLE_WIRING_WIDTH} height={100}
                       className="block h-auto w-full min-w-[700px]" />}
                 </div>
-              </div> : <p role="alert" className="text-sm text-red-700">This saved drawing could not be loaded. It has not been changed.</p>)}
+              </details> : <p role="alert" className="text-sm text-red-700">This saved drawing could not be loaded. It has not been changed.</p>)}
               {cable.attachments.length > 0 && (
                 <CableAttachmentPreviews cableId={cable.id} cableName={cable.name} attachments={cable.attachments} />
               )}
             </div>
           ); })}
           </div>)}
-      </Panel>
+      </Panel>}
 
-      <Panel id="work-log" title="Work log" description="Record finished batches. The pin count and rate are saved with each batch.">
+      {section === "work" && <Panel id="work-log" title="Work log" description="Record finished batches. The pin count and rate are saved with each batch.">
         {cables.some((cable) => !cable.requiresDrawing || cable.pinCountFromDrawing)
           ? <AddForm title="Record a completed batch"><CableWorkForm cables={cables.filter((cable) => !cable.requiresDrawing || cable.pinCountFromDrawing).map(({ id, name }) => ({ id, name }))} /></AddForm>
-          : <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Add a <a href="#cable-types" className="font-medium text-blue-700 underline">harness</a> and save its drawing before recording a batch.</p>}
+          : <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Add a <Link href="/admin/cable-making?section=harnesses" className="font-medium text-blue-700 underline">harness</Link> and save its drawing before recording a batch.</p>}
         {work.length ? (
           <LedgerTable headings={["Completed", "Cable", "Location", "Quantity", "Terminations per harness", "Total terminations", "Rate per termination", "Earned", "Actions"]}>
             {work.map((row) => (
@@ -214,9 +229,9 @@ export default async function CableMakingPage() {
             ))}
           </LedgerTable>
         ) : <p className="text-sm text-slate-600">No completed batches recorded yet.</p>}
-      </Panel>
+      </Panel>}
 
-      <Panel id="payments" title="Payments" description="Keep a record of money already paid. Recording a payment does not send money.">
+      {section === "payments" && <Panel id="payments" title="Payments" description="Keep a record of money already paid. Recording a payment does not send money.">
         <AddForm title="Record a payment"><CablePaymentForm /></AddForm>
         {payments.length ? (
           <LedgerTable headings={["Paid", "Amount", "Reference or note", "Actions"]}>
@@ -244,7 +259,7 @@ export default async function CableMakingPage() {
             ))}
           </LedgerTable>
         ) : <p className="text-sm text-slate-600">No payments recorded yet.</p>}
-      </Panel>
+      </Panel>}
     </div>
   );
 }

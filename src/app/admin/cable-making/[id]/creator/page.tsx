@@ -30,7 +30,7 @@ export default async function CableCreatorPage({ params }: { params: Promise<{ i
     <div className="space-y-5">
       <header className="print:hidden">
         <div className="flex flex-wrap gap-4 text-sm text-blue-700 underline">
-          <Link href="/admin/cable-making">Back to Cable Making</Link>
+          <Link href="/admin/cable-making?section=harnesses">Back to Harnesses</Link>
           <Link href="/admin/cable-making/parts">Parts library</Link>
         </div>
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-blue-700">Harness Creator</p>

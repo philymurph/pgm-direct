@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CablePartForm, EditCablePartButton } from "@/components/admin/CablePartForm";
+import { CableMakingNav } from "@/components/admin/CableMakingNav";
 import { DeleteCableRecordButton } from "@/components/admin/CableMakingForms";
 import { getSession } from "@/lib/auth";
 import { cablePartOption } from "@/lib/cable-parts";
@@ -17,6 +18,7 @@ export default async function CablePartsPage() {
       <h1 className="mt-4 text-2xl font-bold">Connectors and cables</h1>
       <p className="mt-1 text-sm text-slate-600">Define reusable parts, then choose them when creating a harness. Saved harnesses keep a copy of the details.</p>
     </header>
+    <CableMakingNav active="parts" />
     {(["CONNECTOR", "CABLE_STOCK"] as const).map((kind) => {
       const entries = parts.filter((part) => part.kind === kind);
       const title = kind === "CONNECTOR" ? "Connectors" : "Cables";

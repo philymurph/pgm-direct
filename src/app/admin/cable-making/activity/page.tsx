@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CableMakingNav } from "@/components/admin/CableMakingNav";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -40,6 +41,7 @@ export default async function CableActivityPage({ searchParams }: {
         Attachment entries record file details and a fingerprint, not the file contents.
       </p>
     </header>
+    <CableMakingNav active="activity" />
     {entries.length === 0 ? <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
       No changes recorded yet.
     </p> : <ol className="space-y-3">
