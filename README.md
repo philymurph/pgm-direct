@@ -153,7 +153,8 @@ image uploads, and company settings. Promote a user to admin by setting
 **Cable Making** (`/admin/cable-making`) tracks work and payments for one cable
 maker. Add a harness (the default is €1 per pin termination), open Harness Creator to
 prepare a drawing, then use the Work log to record completed batches. The
-add forms open within their sections. Each batch keeps the cable name, pin count,
+saved drawing appears on its harness card; open Harness Creator to edit it.
+The add forms open within their sections. Each batch keeps the cable name, pin count,
 and rate used at the time.
 The location summary totals completed batches by their recorded cable name and
 location, including older batches with no location. It is not a current stock

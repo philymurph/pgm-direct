@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { saveCableWiring } from "@/actions/admin/cable-making";
-import { CableImageButton } from "@/components/admin/CableImageButton";
+import { FullHarnessDrawing } from "@/components/admin/FullHarnessDrawing";
 import type { CablePartOption } from "@/lib/cable-parts";
 import { coreColourDescription } from "@/lib/core-colours";
 import { connectorPinTerminations } from "@/lib/cable-wiring";
 import { fullHarnessSchema, type FullHarness } from "@/lib/full-harness";
-import { fullHarnessImageTargets, fullHarnessSvg, fullHarnessSvgHeight } from "@/lib/full-harness-svg";
+import { fullHarnessSvg } from "@/lib/full-harness-svg";
 
 const field = "mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm";
 const button = "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50";
@@ -174,16 +173,7 @@ export function FullHarnessCreator({ id, name, initial, parts, hasHarnessImage }
       </li>)}</ul>
       {svg && <div className="overflow-x-auto print:hidden">
         <p className="mb-2 text-sm text-slate-600">Click a camera marker to view its image. Save the drawing to keep image changes.</p>
-        <div className="relative min-w-[720px]">
-          <Image className="block h-auto w-full" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
-            alt={`${name} schematic harness drawing`} width={1200} height={fullHarnessSvgHeight(valid.data)} unoptimized />
-          {hasHarnessImage && <CableImageButton marker src={`/admin/cable-making/${id}/attachments/IMAGE?preview=1`} label={`${name} harness`}
-            style={{ left: "2.6%", top: 0, width: "94%", height: `${64 / fullHarnessSvgHeight(valid.data) * 100}%` }} />}
-          {fullHarnessImageTargets(valid.data).map((target, index) => <CableImageButton key={`${index}:${target.imageId}`} marker
-            src={`/admin/cable-making/parts/${target.partId}/images/${target.imageId}`} label={target.label}
-            style={{ left: `${target.x / 12}%`, top: `${target.y / fullHarnessSvgHeight(valid.data) * 100}%`,
-              width: `${target.width / 12}%`, height: `${target.height / fullHarnessSvgHeight(valid.data) * 100}%` }} />)}
-        </div>
+        <FullHarnessDrawing id={id} name={name} design={valid.data} svg={svg} hasHarnessImage={hasHarnessImage} />
       </div>}
       {valid.data.segments.map((segment, index) => <div key={index} className="space-y-2">
         <h3 className="font-semibold">Cable {index + 1}: {segment.cableSpec}{segment.partNumber ? ` (${segment.partNumber})` : ""} · {segment.lengthMm} mm</h3>

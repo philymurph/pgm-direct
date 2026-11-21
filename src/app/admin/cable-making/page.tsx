@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { CableAttachmentPreviews } from "@/components/admin/CableAttachmentPreviews";
+import { FullHarnessDrawing } from "@/components/admin/FullHarnessDrawing";
 import {
   CablePaymentForm,
   CableTypeForm,
@@ -14,8 +16,10 @@ import {
 import { getSession } from "@/lib/auth";
 import { cableBalance } from "@/lib/cable-making";
 import { cableWorkLocationLabels, summarizeCableWorkByLocation } from "@/lib/cable-work-location";
+import { CABLE_WIRING_WIDTH } from "@/lib/cable-wiring";
 import { prisma } from "@/lib/db";
 import { formatEuro, toDecimal } from "@/lib/money";
+import { savedHarnessDrawing } from "@/lib/saved-harness-drawing";
 
 const numbers = new Intl.NumberFormat("en-IE");
 const dates = new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeZone: "UTC" });
@@ -62,7 +66,7 @@ export default async function CableMakingPage() {
   const [cables, work, payments] = await prisma.$transaction([
     prisma.cableType.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, pinsPerCable: true, pinCountFromDrawing: true, requiresDrawing: true, ratePerPin: true, attachments: { select: { kind: true, fileName: true } } },
+      select: { id: true, name: true, pinsPerCable: true, pinCountFromDrawing: true, requiresDrawing: true, ratePerPin: true, wiringDesign: true, attachments: { select: { kind: true, fileName: true } } },
     }),
     prisma.cableWork.findMany({ orderBy: [{ completedOn: "desc" }, { createdAt: "desc" }] }),
     prisma.cablePayment.findMany({ orderBy: [{ paidOn: "desc" }, { createdAt: "desc" }] }),
@@ -132,7 +136,9 @@ export default async function CableMakingPage() {
           <AddForm title="Add a harness" open={cables.length === 0}><CableTypeForm /></AddForm>
           {cables.length === 0 ? <p className="text-sm text-slate-600">No harnesses yet. Add one to create a drawing.</p> : (
           <div className="grid gap-3">
-          {cables.map((cable) => (
+          {cables.map((cable) => {
+            const drawing = savedHarnessDrawing(cable.name, cable.wiringDesign);
+            return (
             <div key={cable.id} className="space-y-3 rounded-lg border border-slate-200 p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -140,7 +146,9 @@ export default async function CableMakingPage() {
                   <p className="mt-1 text-sm text-slate-600">{cable.requiresDrawing && !cable.pinCountFromDrawing ? "Drawing required before recording work" : `${numbers.format(cable.pinsPerCable)} pin terminations per harness${cable.pinCountFromDrawing ? " · from saved drawing" : " · manually entered"}`} · {formatEuro(cable.ratePerPin)} per termination</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <EditCableTypeButton cable={{ ...cable, ratePerPin: cable.ratePerPin.toFixed(2) }} />
+                  <EditCableTypeButton cable={{ id: cable.id, name: cable.name, pinsPerCable: cable.pinsPerCable,
+                    pinCountFromDrawing: cable.pinCountFromDrawing, requiresDrawing: cable.requiresDrawing,
+                    ratePerPin: cable.ratePerPin.toFixed(2), attachments: cable.attachments }} />
                   <DeleteCableRecordButton
                     target={{ type: "cable", id: cable.id }}
                     label="Delete cable type"
@@ -151,11 +159,22 @@ export default async function CableMakingPage() {
               <Link href={`/admin/cable-making/${cable.id}/creator`} className="inline-block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                 Open Harness Creator
               </Link>
+              {drawing && (drawing.success ? <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-slate-900">Saved wiring drawing</h4>
+                <div className="max-h-96 overflow-auto rounded-md border border-slate-200" tabIndex={0} aria-label={`${cable.name} saved drawing, scrollable`}>
+                  {drawing.design.version === 4
+                    ? <FullHarnessDrawing id={cable.id} name={cable.name} design={drawing.design} svg={drawing.svg}
+                      hasHarnessImage={cable.attachments.some((attachment) => attachment.kind === "IMAGE")} />
+                    : <Image unoptimized src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.svg)}`}
+                      alt={`${cable.name} saved wiring drawing`} width={CABLE_WIRING_WIDTH} height={100}
+                      className="block h-auto w-full min-w-[700px]" />}
+                </div>
+              </div> : <p role="alert" className="text-sm text-red-700">This saved drawing could not be loaded. It has not been changed.</p>)}
               {cable.attachments.length > 0 && (
                 <CableAttachmentPreviews cableId={cable.id} cableName={cable.name} attachments={cable.attachments} />
               )}
             </div>
-          ))}
+          ); })}
           </div>)}
       </Panel>
 

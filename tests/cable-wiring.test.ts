@@ -3,6 +3,7 @@ import test from "node:test";
 import { cableWiringSchema, harnessWiringSchema, simpleHarnessSchema, simpleHarnessSvg, cableWiringSvg, connectorPinTerminations, connectCableTerminals } from "../src/lib/cable-wiring";
 import { fullHarnessSchema } from "../src/lib/full-harness";
 import { fullHarnessImageTargets, fullHarnessSvg, fullHarnessSvgHeight } from "../src/lib/full-harness-svg";
+import { savedHarnessDrawing } from "../src/lib/saved-harness-drawing";
 
 const advancedWiringSchema = cableWiringSchema.pipe(harnessWiringSchema);
 
@@ -46,6 +47,26 @@ const branched = {
       cores: [{ spare: false, from: "signal", to: "Label A" }] },
   ],
 };
+
+test("saved harness preview renders full, simple, advanced and legacy drawings", () => {
+  const advanced = cableWiringSchema.parse(split);
+  for (const [design, expected] of [
+    [branched, "Group signal"],
+    [simple, "PRINT THIS LABEL"],
+    [advanced, "Branch one"],
+    [split, "Branch one"],
+  ] as const) {
+    const preview = savedHarnessDrawing("Saved harness", design);
+    assert.ok(preview?.success);
+    assert.match(preview.svg, /Saved harness/);
+    assert.ok(preview.svg.includes(expected));
+  }
+});
+
+test("saved harness preview distinguishes missing and invalid drawings", () => {
+  assert.equal(savedHarnessDrawing("Harness", null), null);
+  assert.deepEqual(savedHarnessDrawing("Harness", { version: 4, ends: [] }), { success: false });
+});
 
 test("full harness validates multi-cable splice groups and counts connector terminations", () => {
   assert.equal(fullHarnessSchema.safeParse({ version: 4, ends: [], segments: [] }).success, false);
