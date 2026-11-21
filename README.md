@@ -154,8 +154,9 @@ image uploads, and company settings. Promote a user to admin by setting
 maker. Use Overview for totals, Harnesses for creating and searching harnesses,
 Parts for connectors and cables, Work log for completed batches, Payments for
 payments, and Activity for the audit log. Add a harness (the default is €1 per
-pin termination), then open Harness Creator to prepare a drawing. Expand
-**Show saved wiring drawing** on its harness card to view it; open Harness Creator to edit it.
+pin termination), then open Harness Creator to prepare a drawing. Each saved
+drawing has a small preview on its harness card; expand **View full drawing**
+for details or open Harness Creator to edit it.
 The add forms open within their sections. Each batch keeps the cable name, pin count,
 and rate used at the time.
 The location summary totals completed batches by their recorded cable name and

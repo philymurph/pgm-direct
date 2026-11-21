@@ -150,11 +150,12 @@ export default async function CableMakingPage({ searchParams }: {
           </form>}
           {cables.length === 0 ? <p className="text-sm text-slate-600">No harnesses yet. Add one to create a drawing.</p> : matchingCables.length === 0
             ? <p className="text-sm text-slate-600">No harnesses match your search.</p> : (
-          <div className="grid gap-3">
+          <div className="grid items-start gap-4 lg:grid-cols-2">
           {matchingCables.map((cable) => {
             const drawing = savedHarnessDrawing(cable.name, cable.wiringDesign);
+            const image = drawing?.success ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.svg)}` : null;
             return (
-            <div key={cable.id} className="space-y-3 rounded-lg border border-slate-200 p-4">
+            <div key={cable.id} className="min-w-0 space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="break-words font-semibold text-slate-900">{cable.name}</h3>
@@ -174,17 +175,26 @@ export default async function CableMakingPage({ searchParams }: {
               <Link href={`/admin/cable-making/${cable.id}/creator`} className="inline-block rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                 Open Harness Creator
               </Link>
-              {drawing && (drawing.success ? <details>
-                <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:underline">Show saved wiring drawing</summary>
+              {drawing && (drawing.success && image ? <details>
+                <summary className="group cursor-pointer list-none rounded-lg border border-slate-200 bg-slate-50 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+                  <div className="relative h-36 overflow-hidden rounded border border-slate-200 bg-white">
+                    <Image unoptimized fill src={image} alt={`${cable.name} saved wiring drawing preview`}
+                      sizes="(min-width: 1024px) 40vw, 90vw" className="object-contain" />
+                  </div>
+                  <span className="mt-2 block text-sm font-semibold text-blue-700 group-hover:underline">
+                    View full drawing
+                  </span>
+                </summary>
                 <div className="mt-2 max-h-96 overflow-auto rounded-md border border-slate-200" tabIndex={0} aria-label={`${cable.name} saved drawing, scrollable`}>
                   {drawing.design.version === 4
                     ? <FullHarnessDrawing id={cable.id} name={cable.name} design={drawing.design} svg={drawing.svg}
                       hasHarnessImage={cable.attachments.some((attachment) => attachment.kind === "IMAGE")} />
-                    : <Image unoptimized src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.svg)}`}
+                    : <Image unoptimized src={image}
                       alt={`${cable.name} saved wiring drawing`} width={CABLE_WIRING_WIDTH} height={100}
                       className="block h-auto w-full min-w-[700px]" />}
                 </div>
               </details> : <p role="alert" className="text-sm text-red-700">This saved drawing could not be loaded. It has not been changed.</p>)}
+              {!drawing && <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">No drawing saved yet.</p>}
               {cable.attachments.length > 0 && (
                 <CableAttachmentPreviews cableId={cable.id} cableName={cable.name} attachments={cable.attachments} />
               )}
