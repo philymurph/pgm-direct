@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CablePartForm, EditCablePartButton } from "@/components/admin/CablePartForm";
+import { AddCablePartButton, EditCablePartButton } from "@/components/admin/CablePartForm";
 import { CableMakingNav } from "@/components/admin/CableMakingNav";
 import { DeleteCableRecordButton } from "@/components/admin/CableMakingForms";
 import { getSession } from "@/lib/auth";
@@ -24,10 +24,7 @@ export default async function CablePartsPage() {
       const title = kind === "CONNECTOR" ? "Connectors" : "Cables";
       return <section key={kind} id={kind === "CONNECTOR" ? "connectors" : "cables"} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">{title}</h2>
-        <details open={entries.length === 0} className="rounded-lg bg-slate-50 p-4">
-          <summary className="cursor-pointer font-semibold text-blue-700">Add {kind === "CONNECTOR" ? "a connector" : "a cable"}</summary>
-          <div className="mt-4"><CablePartForm kind={kind} /></div>
-        </details>
+        <AddCablePartButton kind={kind} />
         {entries.length === 0 ? <p className="text-sm text-slate-600">None added yet.</p> :
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{entries.map((part) =>
             <li key={part.id} className="rounded-lg border border-slate-200 p-4">

@@ -7,9 +7,9 @@ import { CableMakingNav } from "@/components/admin/CableMakingNav";
 import { FullHarnessDrawing } from "@/components/admin/FullHarnessDrawing";
 import { LegacyCableMakingLinks } from "@/components/admin/LegacyCableMakingLinks";
 import {
-  CablePaymentForm,
-  CableTypeForm,
-  CableWorkForm,
+  AddCablePaymentButton,
+  AddCableTypeButton,
+  AddCableWorkButton,
   DeleteCableRecordButton,
   EditCablePaymentButton,
   EditCableTypeButton,
@@ -35,15 +35,6 @@ function Panel({ id, title, description, children }: { id: string; title: string
       </div>
       {children}
     </section>
-  );
-}
-
-function AddForm({ title, children, open }: { title: string; children: ReactNode; open?: boolean }) {
-  return (
-    <details open={open} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <summary className="cursor-pointer font-semibold text-blue-700 hover:text-blue-900">{title}</summary>
-      <div className="mt-4 max-w-xl">{children}</div>
-    </details>
   );
 }
 
@@ -138,7 +129,7 @@ export default async function CableMakingPage({ searchParams }: {
 
       {section === "harnesses" && <Panel id="cable-types" title="Harnesses" description="Add a harness, then choose its connectors and cables in Harness Creator. Rate changes apply only to new work.">
           <div className="flex flex-wrap gap-3 text-sm"><Link className="text-blue-700 underline" href="/admin/cable-making/parts#connectors">Manage connectors</Link><Link className="text-blue-700 underline" href="/admin/cable-making/parts#cables">Manage cables</Link></div>
-          <AddForm title="Add a harness" open={cables.length === 0}><CableTypeForm /></AddForm>
+          <AddCableTypeButton />
           {cables.length > 0 && <form action="/admin/cable-making" className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="section" value="harnesses" />
             <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">Search harnesses
@@ -205,7 +196,7 @@ export default async function CableMakingPage({ searchParams }: {
 
       {section === "work" && <Panel id="work-log" title="Work log" description="Record finished batches. The pin count and rate are saved with each batch.">
         {cables.some((cable) => !cable.requiresDrawing || cable.pinCountFromDrawing)
-          ? <AddForm title="Record a completed batch"><CableWorkForm cables={cables.filter((cable) => !cable.requiresDrawing || cable.pinCountFromDrawing).map(({ id, name }) => ({ id, name }))} /></AddForm>
+          ? <AddCableWorkButton cables={cables.filter((cable) => !cable.requiresDrawing || cable.pinCountFromDrawing).map(({ id, name }) => ({ id, name }))} />
           : <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Add a <Link href="/admin/cable-making?section=harnesses" className="font-medium text-blue-700 underline">harness</Link> and save its drawing before recording a batch.</p>}
         {work.length ? (
           <LedgerTable headings={["Completed", "Cable", "Location", "Quantity", "Terminations per harness", "Total terminations", "Rate per termination", "Earned", "Actions"]}>
@@ -242,7 +233,7 @@ export default async function CableMakingPage({ searchParams }: {
       </Panel>}
 
       {section === "payments" && <Panel id="payments" title="Payments" description="Keep a record of money already paid. Recording a payment does not send money.">
-        <AddForm title="Record a payment"><CablePaymentForm /></AddForm>
+        <AddCablePaymentButton />
         {payments.length ? (
           <LedgerTable headings={["Paid", "Amount", "Reference or note", "Actions"]}>
             {payments.map((row) => (

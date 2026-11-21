@@ -1,9 +1,9 @@
 "use client";
 
 import type { CablePartKind } from "@prisma/client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { saveCablePart, type CableFormState } from "@/actions/admin/cable-making";
-import { EditRecordDialog } from "@/components/admin/CableMakingForms";
+import { AddRecordDialog, EditRecordDialog } from "@/components/admin/CableMakingForms";
 import { CoreColourSelect } from "@/components/admin/CoreColourSelect";
 import { cableAttachmentOptions, cableAttachmentSizeError } from "@/lib/cable-attachments";
 import type { CablePartOption } from "@/lib/cable-parts";
@@ -11,15 +11,18 @@ import type { CoreColours } from "@/lib/core-colours";
 
 const fieldClass = "mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2";
 
-export function CablePartForm({ kind, part, onSaved }: { kind: CablePartKind; part?: CablePartOption; onSaved?: () => void }) {
+export function CablePartForm({ kind, part, onSaved, onPendingChange }: {
+  kind: CablePartKind; part?: CablePartOption; onSaved?: (message: string) => void; onPendingChange?: (pending: boolean) => void;
+}) {
   const [cores, setCores] = useState<CoreColours[]>(part?.cores ?? Array.from({ length: 4 }, () => ({})));
   const [state, action, pending] = useActionState(
     async (previous: CableFormState, data: FormData) => {
       const result = await saveCablePart(part?.id ?? null, previous, data);
-      if (result.message) onSaved?.();
+      if (result.message) onSaved?.(result.message);
       return result;
     }, {},
   );
+  useEffect(() => { onPendingChange?.(pending); }, [onPendingChange, pending]);
   const typeName = kind === "CONNECTOR" ? "connector" : "cable";
   return (
     <form action={action} className="max-w-2xl space-y-3 text-sm">
@@ -78,6 +81,13 @@ export function CablePartForm({ kind, part, onSaved }: { kind: CablePartKind; pa
       </button>
     </form>
   );
+}
+
+export function AddCablePartButton({ kind }: { kind: CablePartKind }) {
+  const label = kind === "CONNECTOR" ? "Add a connector" : "Add a cable";
+  return <AddRecordDialog label={label}>
+    {(onSaved, onPendingChange) => <CablePartForm kind={kind} onSaved={onSaved} onPendingChange={onPendingChange} />}
+  </AddRecordDialog>;
 }
 
 export function EditCablePartButton({ part }: { part: CablePartOption }) {

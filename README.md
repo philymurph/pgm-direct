@@ -157,7 +157,7 @@ payments, and Activity for the audit log. Add a harness (the default is €1 per
 pin termination), then open Harness Creator to prepare a drawing. Each saved
 drawing has a small preview on its harness card; expand **View full drawing**
 for details or open Harness Creator to edit it.
-The add forms open within their sections. Each batch keeps the cable name, pin count,
+The add buttons open a dialog for each form. Each batch keeps the cable name, pin count,
 and rate used at the time.
 The location summary totals completed batches by their recorded cable name and
 location, including older batches with no location. It is not a current stock
